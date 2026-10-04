@@ -10,8 +10,12 @@ export interface NdaValues {
   purpose: string;
   /** ISO date (YYYY-MM-DD), as produced by `<input type="date">`. */
   effectiveDate: string;
-  mndaTerm: { kind: "expires"; years: number } | { kind: "untilTerminated" };
-  confidentialityTerm: { kind: "years"; years: number } | { kind: "perpetual" };
+  /**
+   * `years` is kept while the open-ended option is selected so switching back
+   * restores it. NaN means the years field is empty.
+   */
+  mndaTerm: { kind: "expires" | "untilTerminated"; years: number };
+  confidentialityTerm: { kind: "years" | "perpetual"; years: number };
   governingLaw: string;
   jurisdiction: string;
   modifications: string;
@@ -50,7 +54,13 @@ export type Block =
   | { type: "heading"; text: string }
   | { type: "paragraph"; content: Inline[] }
   | { type: "field"; heading: string; hint?: string; lines: FieldLine[] }
-  | { type: "signatures"; headers: [string, string]; rows: { label: string; values: [string, string] }[] }
+  | {
+      type: "signatures";
+      /** The sentence above the table; renderers keep it together with the table. */
+      intro: string;
+      headers: [string, string];
+      rows: { label: string; values: [string, string] }[];
+    }
   | { type: "clause"; number: number; content: Inline[] }
   | { type: "attribution"; content: Inline[] }
   | { type: "pageBreak" };

@@ -14,6 +14,16 @@ describe("loadNdaTemplate", () => {
     expect(template.coverAttribution.some((run) => run.href?.includes("creativecommons"))).toBe(true);
     expect(template.standardTermsAttribution.some((run) => run.href?.includes("creativecommons"))).toBe(true);
   });
+
+  it("keeps every clause complete, including the final sentence of the last one", () => {
+    const { clauses } = loadNdaTemplate();
+    const text = clauses.map((runs) => runs.map((run) => run.text).join(""));
+
+    // Each clause is a single markdown line ending in a full stop; a reflowed
+    // template would leave clauses truncated here.
+    for (const clause of text) expect(clause).toMatch(/\.$/);
+    expect(text[10]).toMatch(/which together form the same agreement\.$/);
+  });
 });
 
 describe("parseNdaTemplate", () => {
@@ -27,5 +37,13 @@ describe("parseNdaTemplate", () => {
         "# Standard Terms\nCommon Paper attribution",
       ),
     ).toThrow(/clauses/);
+  });
+
+  it.each([
+    ["cover page attribution", "## USING THIS MNDA\nIntro", "# Standard Terms\n1. **A**. B\nCommon Paper x"],
+    ["Standard Terms title", "## USING THIS MNDA\nIntro\nCommon Paper x", "1. **A**. B\nCommon Paper x"],
+    ["Standard Terms attribution", "## USING THIS MNDA\nIntro\nCommon Paper x", "# Standard Terms\n1. **A**. B"],
+  ])("throws when the %s is missing", (description, cover, terms) => {
+    expect(() => parseNdaTemplate(cover, terms)).toThrow(description);
   });
 });

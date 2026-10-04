@@ -20,6 +20,21 @@ const styles = StyleSheet.create({
   link: { color: "#1d4ed8" },
 });
 
+const FIELD_HEADING_MIN_PRESENCE = 30;
+
+/**
+ * Longest run of characters a table cell renders unbroken. Narrow enough that
+ * even wide glyphs (16 × "W" at 11pt) fit a party column, so values like
+ * "aaaa…@example.com" wrap instead of spilling into the next column.
+ */
+const MAX_UNBROKEN_CHARS = 16;
+const LONG_RUN = new RegExp(`.{1,${MAX_UNBROKEN_CHARS}}`, "gu");
+
+function breakLongWords(word: string, hyphenate?: (word: string) => string[]): string[] {
+  const syllables = hyphenate ? hyphenate(word) : [word];
+  return syllables.flatMap((part) => part.match(LONG_RUN) ?? [part]);
+}
+
 function InlineText({ content }: { content: Inline[] }) {
   return content.map((run, i) => {
     if (run.href) {
@@ -50,10 +65,14 @@ function BlockView({ block }: { block: Block }) {
         </Text>
       );
     case "field":
+      // Long values may continue on the next page, but a heading is never left
+      // stranded at the bottom of a page without at least a line of its value.
       return (
-        <View style={styles.field} wrap={false}>
-          <Text style={styles.fieldHeading}>{block.heading}</Text>
-          {block.hint && <Text style={styles.hint}>{block.hint}</Text>}
+        <View style={styles.field}>
+          <View minPresenceAhead={FIELD_HEADING_MIN_PRESENCE}>
+            <Text style={styles.fieldHeading}>{block.heading}</Text>
+            {block.hint && <Text style={styles.hint}>{block.hint}</Text>}
+          </View>
           {block.lines.map((line, i) => (
             <Text key={i}>
               {line.label && <Text style={styles.bold}>{line.label}: </Text>}
@@ -64,25 +83,29 @@ function BlockView({ block }: { block: Block }) {
       );
     case "signatures":
       return (
-        <View style={styles.table} wrap={false}>
-          <View style={styles.row}>
-            <Text style={[styles.cell, styles.labelCell]} />
-            {block.headers.map((header) => (
-              <Text key={header} style={[styles.cell, styles.bold]}>
-                {header}
-              </Text>
-            ))}
-          </View>
-          {block.rows.map((row) => (
-            <View key={row.label} style={styles.row}>
-              <Text style={[styles.cell, styles.labelCell]}>{row.label}</Text>
-              {row.values.map((value, i) => (
-                <Text key={i} style={styles.cell}>
-                  {value}
+        // The intro sentence and the table move to a new page together, never split.
+        <View wrap={false}>
+          <Text style={styles.paragraph}>{block.intro}</Text>
+          <View style={styles.table}>
+            <View style={styles.row}>
+              <Text style={[styles.cell, styles.labelCell]} />
+              {block.headers.map((header) => (
+                <Text key={header} style={[styles.cell, styles.bold]}>
+                  {header}
                 </Text>
               ))}
             </View>
-          ))}
+            {block.rows.map((row) => (
+              <View key={row.label} style={styles.row}>
+                <Text style={[styles.cell, styles.labelCell]}>{row.label}</Text>
+                {row.values.map((value, i) => (
+                  <Text key={i} style={styles.cell} hyphenationCallback={breakLongWords}>
+                    {value}
+                  </Text>
+                ))}
+              </View>
+            ))}
+          </View>
         </View>
       );
     case "clause":

@@ -24,11 +24,16 @@ export function todayIso(now = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-/** Formats YYYY-MM-DD as e.g. "October 4, 2026"; returns undefined for invalid input. */
+/**
+ * Formats YYYY-MM-DD as e.g. "October 4, 2026"; returns undefined for invalid input.
+ * Years before 1000 are rejected: date inputs emit them while a year is being typed
+ * (e.g. "0027"), and Date.UTC would silently map 0–99 to 1900–1999.
+ */
 export function formatDate(iso: string): string | undefined {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!match) return undefined;
   const [, year, month, day] = match.map(Number);
+  if (year < 1000) return undefined;
   // Build in UTC and format in UTC so the calendar date never shifts by time zone.
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCMonth() !== month - 1) return undefined;
@@ -40,9 +45,11 @@ export function formatDate(iso: string): string | undefined {
   });
 }
 
-/** "1 year" / "3 years"; undefined unless `years` is a positive whole number. */
+export const MAX_TERM_YEARS = 100;
+
+/** "1 year" / "3 years"; undefined unless `years` is a whole number from 1 to MAX_TERM_YEARS. */
 export function formatYears(years: number): string | undefined {
-  if (!Number.isInteger(years) || years < 1) return undefined;
+  if (!Number.isInteger(years) || years < 1 || years > MAX_TERM_YEARS) return undefined;
   return years === 1 ? "1 year" : `${years} years`;
 }
 
@@ -124,13 +131,8 @@ export function buildNdaDocument(template: NdaTemplate, values: NdaValues): Bloc
       lines: [fixed(values.modifications.trim() || "None.")],
     },
     {
-      type: "paragraph",
-      content: [
-        { text: "By signing this Cover Page, each party agrees to enter into this MNDA as of the Effective Date." },
-      ],
-    },
-    {
       type: "signatures",
+      intro: "By signing this Cover Page, each party agrees to enter into this MNDA as of the Effective Date.",
       headers: ["Party 1", "Party 2"],
       rows: [
         { label: "Signature", values: ["", ""] },
@@ -151,10 +153,17 @@ export function buildNdaDocument(template: NdaTemplate, values: NdaValues): Bloc
   ];
 }
 
-/** A filesystem-safe PDF filename based on the party companies. */
+const MAX_SLUG_LENGTH = 40;
+
+/** A filesystem-safe ASCII PDF filename based on the party companies. */
 export function pdfFilename(values: NdaValues): string {
   const slug = (s: string) =>
-    s.trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "");
+    s
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "") // strip accents: "Müller" -> "Muller"
+      .replace(/[^a-z0-9]+/gi, "-")
+      .slice(0, MAX_SLUG_LENGTH)
+      .replace(/^-+|-+$/g, "");
   const companies = values.parties.map((p) => slug(p.company)).filter(Boolean);
   return ["Mutual-NDA", ...companies].join("-") + ".pdf";
 }

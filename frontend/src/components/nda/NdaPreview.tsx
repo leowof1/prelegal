@@ -47,32 +47,37 @@ function BlockView({ block }: { block: Block }) {
       );
     case "signatures":
       return (
-        <table className="w-full table-fixed border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="w-1/4 border border-stone-300 p-2">
-                <span className="sr-only">Field</span>
-              </th>
-              {block.headers.map((header) => (
-                <th key={header} className="border border-stone-300 p-2">
-                  {header}
+        <div className="space-y-4">
+          <p>{block.intro}</p>
+          <table className="w-full table-fixed border-collapse text-sm">
+            <thead>
+              <tr>
+                <th scope="col" className="w-1/4 border border-stone-300 p-2">
+                  <span className="sr-only">Field</span>
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {block.rows.map((row) => (
-              <tr key={row.label}>
-                <th className="border border-stone-300 p-2 text-left font-semibold">{row.label}</th>
-                {row.values.map((value, i) => (
-                  <td key={i} className="h-10 whitespace-pre-line break-words border border-stone-300 p-2">
-                    {value}
-                  </td>
+                {block.headers.map((header) => (
+                  <th key={header} scope="col" className="border border-stone-300 p-2">
+                    {header}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {block.rows.map((row) => (
+                <tr key={row.label}>
+                  <th scope="row" className="border border-stone-300 p-2 text-left font-semibold">
+                    {row.label}
+                  </th>
+                  {row.values.map((value, i) => (
+                    <td key={i} className="h-10 whitespace-pre-line break-words border border-stone-300 p-2">
+                      {value}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       );
     case "clause":
       return (

@@ -21,4 +21,19 @@ describe("parseInline", () => {
       { text: "." },
     ]);
   });
+
+  it("returns no runs for an empty string", () => {
+    expect(parseInline("")).toEqual([]);
+  });
+
+  it("parses adjacent constructs without empty runs between them", () => {
+    expect(parseInline("[a](https://a.test)**b**")).toEqual([
+      { text: "a", href: "https://a.test" },
+      { text: "b", bold: true },
+    ]);
+  });
+
+  it("leaves an unterminated bold marker as literal text", () => {
+    expect(parseInline("a **b")).toEqual([{ text: "a **b" }]);
+  });
 });

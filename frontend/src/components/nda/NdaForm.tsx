@@ -1,10 +1,14 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
+import { formatYears, MAX_TERM_YEARS } from "@/lib/nda/build";
 import type { NdaValues, PartyDetails } from "@/lib/nda/types";
 
-const inputClass =
-  "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-stone-100 disabled:text-stone-400";
+// Width is kept out of the shared classes: conflicting Tailwind width utilities
+// (e.g. w-full and w-20) resolve by stylesheet order, not class order.
+const inputBase =
+  "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-stone-100 disabled:text-stone-400";
+const inputClass = `w-full ${inputBase}`;
 
 function TextField({
   label,
@@ -56,22 +60,28 @@ function Fieldset({ legend, children }: { legend: string; children: ReactNode })
 }
 
 /**
- * A choice between "N years" and an open-ended alternative.
- * `years` is null when the alternative is selected; 0 means the number field is empty.
+ * A choice between a fixed number of years and an open-ended alternative.
+ * The years value is kept while the alternative is selected, so switching back restores it.
  */
 function TermChoice({
   legend,
   years,
+  fixed,
   alternativeLabel,
-  onChange,
+  onYearsChange,
+  onFixedChange,
 }: {
   legend: string;
-  years: number | null;
+  /** NaN when the field is empty. */
+  years: number;
+  fixed: boolean;
   alternativeLabel: string;
-  onChange: (years: number | null) => void;
+  onYearsChange: (years: number) => void;
+  onFixedChange: (fixed: boolean) => void;
 }) {
   const name = useId();
-  const yearsSelected = years !== null;
+  const errorId = `${name}-error`;
+  const invalid = fixed && formatYears(years) === undefined;
   return (
     <fieldset className="space-y-2 text-sm text-stone-800">
       <legend className="mb-1 font-medium">{legend}</legend>
@@ -80,23 +90,31 @@ function TermChoice({
           type="radio"
           name={name}
           aria-label="A fixed number of years"
-          checked={yearsSelected}
-          onChange={() => onChange(1)}
+          checked={fixed}
+          onChange={() => onFixedChange(true)}
         />
         <input
           type="number"
           min={1}
+          max={MAX_TERM_YEARS}
           step={1}
           aria-label={`${legend} in years`}
-          className={`${inputClass} w-20`}
-          value={yearsSelected ? years || "" : 1}
-          disabled={!yearsSelected}
-          onChange={(e) => onChange(Number(e.target.value) || 0)}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? errorId : undefined}
+          className={`w-20 shrink-0 ${inputBase} aria-invalid:border-red-500`}
+          value={Number.isNaN(years) ? "" : years}
+          disabled={!fixed}
+          onChange={(e) => onYearsChange(e.target.value === "" ? NaN : Number(e.target.value))}
         />
         <span aria-hidden>year(s) from Effective Date</span>
       </div>
+      {invalid && (
+        <p id={errorId} className="text-xs text-red-700">
+          Enter a whole number of years from 1 to {MAX_TERM_YEARS}.
+        </p>
+      )}
       <label className="flex items-center gap-2">
-        <input type="radio" name={name} checked={!yearsSelected} onChange={() => onChange(null)} />
+        <input type="radio" name={name} checked={!fixed} onChange={() => onFixedChange(false)} />
         {alternativeLabel}
       </label>
     </fieldset>
@@ -132,18 +150,22 @@ export function NdaForm({ values, onChange }: { values: NdaValues; onChange: (va
         <TextField label="Effective Date" type="date" value={values.effectiveDate} onChange={set("effectiveDate")} />
         <TermChoice
           legend="MNDA Term"
-          years={values.mndaTerm.kind === "expires" ? values.mndaTerm.years : null}
+          years={values.mndaTerm.years}
+          fixed={values.mndaTerm.kind === "expires"}
           alternativeLabel="Continues until terminated"
-          onChange={(years) =>
-            set("mndaTerm")(years === null ? { kind: "untilTerminated" } : { kind: "expires", years })
+          onYearsChange={(years) => set("mndaTerm")({ ...values.mndaTerm, years })}
+          onFixedChange={(fixed) =>
+            set("mndaTerm")({ ...values.mndaTerm, kind: fixed ? "expires" : "untilTerminated" })
           }
         />
         <TermChoice
           legend="Term of Confidentiality"
-          years={values.confidentialityTerm.kind === "years" ? values.confidentialityTerm.years : null}
+          years={values.confidentialityTerm.years}
+          fixed={values.confidentialityTerm.kind === "years"}
           alternativeLabel="In perpetuity"
-          onChange={(years) =>
-            set("confidentialityTerm")(years === null ? { kind: "perpetual" } : { kind: "years", years })
+          onYearsChange={(years) => set("confidentialityTerm")({ ...values.confidentialityTerm, years })}
+          onFixedChange={(fixed) =>
+            set("confidentialityTerm")({ ...values.confidentialityTerm, kind: fixed ? "years" : "perpetual" })
           }
         />
       </Fieldset>

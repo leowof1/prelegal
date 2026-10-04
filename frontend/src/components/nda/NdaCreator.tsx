@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { buildNdaDocument, defaultNdaValues, pdfFilename, todayIso } from "@/lib/nda/build";
+import { unsupportedPdfCharacters } from "@/lib/nda/pdf-charset";
 import type { NdaTemplate, NdaValues } from "@/lib/nda/types";
 import { NdaForm } from "./NdaForm";
 import { NdaPreview } from "./NdaPreview";
@@ -22,6 +23,7 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
   const values = edited ?? defaultNdaValues(today);
 
   const blocks = buildNdaDocument(template, values);
+  const unsupported = unsupportedPdfCharacters(values);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +68,13 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
             {downloading ? "Preparing PDF…" : "Download PDF"}
           </button>
         </div>
+        {unsupported.length > 0 && (
+          <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+            The PDF can&apos;t display these characters and will show them garbled:{" "}
+            <span className="font-semibold">{unsupported.slice(0, 10).join(" ")}</span>
+            {unsupported.length > 10 && " …"}. Use Latin characters for names and addresses.
+          </p>
+        )}
         {error && (
           <p role="alert" className="text-sm text-red-700">
             {error}
