@@ -19,9 +19,9 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
-  // Tests run against the production build, as users would see it.
+  // Tests run against the static export served by the FastAPI backend, as users would see it.
   webServer: {
-    command: `npm run build && npx next start -p ${PORT}`,
+    command: `npm run build && cd ../backend && uv run uvicorn prelegal_backend.main:app_from_env --factory --port ${PORT}`,
     url: `http://localhost:${PORT}`,
     // Always build and serve fresh: reusing whatever is on the port could test a stale build.
     reuseExistingServer: false,

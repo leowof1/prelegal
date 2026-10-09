@@ -6,6 +6,7 @@ import { unsupportedPdfCharacters } from "@/lib/nda/pdf-charset";
 import type { NdaTemplate, NdaValues } from "@/lib/nda/types";
 import { NdaForm } from "./NdaForm";
 import { NdaPreview } from "./NdaPreview";
+import { submitButtonClass } from "@/components/ui/styles";
 
 const noopSubscribe = () => () => {};
 
@@ -63,7 +64,7 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
             type="button"
             onClick={downloadPdf}
             disabled={downloading}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-60"
+            className={`${submitButtonClass} disabled:cursor-wait disabled:opacity-60`}
           >
             {downloading ? "Preparing PDF…" : "Download PDF"}
           </button>
@@ -84,7 +85,7 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
           role="region"
           aria-label="Agreement preview"
           tabIndex={0}
-          className="max-h-[calc(100vh-8rem)] overflow-y-auto rounded-lg border border-stone-200 bg-white p-8 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 sm:p-12"
+          className="max-h-[calc(100vh-8rem)] overflow-y-auto rounded-lg border border-stone-200 bg-white p-8 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue sm:p-12"
         >
           <NdaPreview blocks={blocks} />
         </div>
