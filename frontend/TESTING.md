@@ -5,7 +5,7 @@
 | Command             | What it covers                                                                                   |
 | ------------------- | ------------------------------------------------------------------------------------------------ |
 | `npm test`          | Vitest: template parsing and markdown edge cases; document building (dates, term years, placeholders, filenames, literal user markup); PDF content and layout read back with pdfjs (page breaks, clause order, attribution on every page, long and non-Latin input, cell overflow); form/preview/download component tests in jsdom; server-rendered HTML |
-| `npm run test:e2e`  | Playwright against a fresh production build in Chromium, Firefox, WebKit and a mobile viewport: full flow incl. real PDF download, term switching and validation, long/non-Latin input, keyboard use, axe WCAG 2.1 A/AA scan, responsive layout, no console errors |
+| `npm run test:e2e`  | Playwright against a fresh static export served by the FastAPI backend (needs `uv`), in Chromium, Firefox, WebKit and a mobile viewport: fake sign-in/sign-out; full flow incl. real PDF download, term switching and validation, long/non-Latin input, keyboard use, axe WCAG 2.1 A/AA scan, responsive layout, no console errors |
 | `npm run lint`      | ESLint                                                                                           |
 | `npm run typecheck` | TypeScript                                                                                       |
 
@@ -14,12 +14,12 @@ CI (`.github/workflows/frontend.yml`) runs all of the above on every PR that tou
 
 ## Manual checklist
 
-Run `npm run build && npm start` and open http://localhost:3000. Covers what automation can't judge: how the
+Run `scripts/start-mac.sh` (or the Linux/Windows script) from the repo root and open http://localhost:8000. Covers what automation can't judge: how the
 document looks and whether the PDF opens correctly in a real viewer.
 
 | #  | Step                                                                                         | Expected                                                                                              |
 | -- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 1  | Load the page                                                                                | Form left, preview right; Effective Date is today; amber highlights on Governing Law and Jurisdiction  |
+| 1  | Sign in with any name and email                                                              | Form left, preview right; Effective Date is today; amber highlights on Governing Law and Jurisdiction  |
 | 2  | Fill Governing Law and Jurisdiction                                                          | Highlights disappear; values appear under "Governing Law & Jurisdiction"                              |
 | 3  | Change MNDA Term years to 3, then select "Continues until terminated"                        | Text reads "Expires 3 years…", then the until-terminated wording; years box greys out                 |
 | 4  | Select "In perpetuity" for Term of Confidentiality                                           | Preview reads "In perpetuity."                                                                        |

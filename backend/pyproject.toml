@@ -1,0 +1,25 @@
+[project]
+name = "prelegal-backend"
+version = "0.1.0"
+description = "Prelegal API and static frontend server"
+authors = [
+    { name = "Leopold Wolf", email = "leopoldw658@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.143.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

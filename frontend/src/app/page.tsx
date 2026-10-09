@@ -1,21 +1,24 @@
-import { NdaCreator } from "@/components/nda/NdaCreator";
-import { loadNdaTemplate } from "@/lib/nda/template";
+import type { Metadata } from "next";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { LoginForm } from "@/components/login/LoginForm";
 
-export default function Home() {
-  // Runs at build time: the page is statically rendered from the repo's templates.
-  const template = loadNdaTemplate();
+export const metadata: Metadata = {
+  title: "Sign in | Prelegal",
+};
 
+export default function LoginPage() {
   return (
-    <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-10 sm:px-6 lg:px-8">
-      <header className="mb-8 space-y-2">
-        <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Prelegal</p>
-        <h1 className="text-3xl font-bold tracking-tight text-stone-900">Mutual NDA Creator</h1>
-        <p className="max-w-2xl text-stone-600">
-          Fill in the key terms and see the Common Paper Mutual Non-Disclosure Agreement update as you type. When
-          you&apos;re done, download it as a PDF ready to sign.
-        </p>
-      </header>
-      <NdaCreator template={template} />
-    </main>
+    <>
+      <AppHeader />
+      <main className="flex flex-1 items-start justify-center px-4 py-16">
+        <div className="w-full max-w-sm space-y-6 rounded-lg border border-stone-200 bg-white p-8 shadow-sm">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold tracking-tight text-brand-navy">Sign in</h1>
+            <p className="text-sm text-stone-600">Draft common legal agreements from trusted templates.</p>
+          </div>
+          <LoginForm />
+        </div>
+      </main>
+    </>
   );
 }

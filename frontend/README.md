@@ -1,7 +1,8 @@
 # Prelegal frontend
 
-Next.js app for drafting legal agreements. It currently contains the **Mutual NDA Creator** prototype (PL-3): the user
-fills in the key terms, sees the Common Paper Mutual NDA update live, and downloads it as a PDF.
+Next.js app for drafting legal agreements. `/` is a placeholder sign-in screen (any name and email, no real
+authentication yet). `/nda/` is the **Mutual NDA Creator**: the user fills in the key terms, sees the Common Paper
+Mutual NDA update live, and downloads it as a PDF.
 
 ## Getting started
 
@@ -13,11 +14,14 @@ npm run dev      # http://localhost:3000
 | Script          | Purpose                    |
 | --------------- | -------------------------- |
 | `npm run dev`   | Start the dev server       |
-| `npm run build` | Production build           |
+| `npm run build` | Static export to `out/`    |
 | `npm test`      | Unit tests (Vitest)        |
 | `npm run lint`  | ESLint                     |
 
 ## How it works
+
+- The app is a static export (`output: "export"`), served in production by the FastAPI backend in `../backend`.
+  The signed-in user is kept in `localStorage` (`src/lib/session/user.ts`).
 
 - `src/lib/nda/template.ts` reads `../templates/Mutual-NDA-coverpage.md` and `../templates/Mutual-NDA.md` at build
   time (the page is statically rendered), so the repo's `templates/` directory stays the single source of truth.

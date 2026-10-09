@@ -17,9 +17,9 @@ function InlineText({ content }: { content: Inline[] }) {
 function BlockView({ block }: { block: Block }) {
   switch (block.type) {
     case "title":
-      return <h2 className="text-center text-2xl font-bold">{block.text}</h2>;
+      return <h2 className="text-center text-2xl font-bold text-brand-navy">{block.text}</h2>;
     case "heading":
-      return <h3 className="mt-2 text-sm font-bold uppercase tracking-wide">{block.text}</h3>;
+      return <h3 className="mt-2 text-sm font-bold uppercase tracking-wide text-brand-navy">{block.text}</h3>;
     case "paragraph":
       return (
         <p>
@@ -92,7 +92,7 @@ function BlockView({ block }: { block: Block }) {
         </p>
       );
     case "pageBreak":
-      return <hr className="my-6 border-dashed border-stone-300" />;
+      return <hr className="my-6 border-dashed border-brand-gray" />;
   }
 }
 

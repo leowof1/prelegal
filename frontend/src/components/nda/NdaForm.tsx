@@ -3,12 +3,7 @@
 import { useId, type ReactNode } from "react";
 import { formatYears, MAX_TERM_YEARS } from "@/lib/nda/build";
 import type { NdaValues, PartyDetails } from "@/lib/nda/types";
-
-// Width is kept out of the shared classes: conflicting Tailwind width utilities
-// (e.g. w-full and w-20) resolve by stylesheet order, not class order.
-const inputBase =
-  "rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-stone-100 disabled:text-stone-400";
-const inputClass = `w-full ${inputBase}`;
+import { inputBase, inputClass } from "@/components/ui/styles";
 
 function TextField({
   label,
@@ -53,7 +48,7 @@ function TextField({
 function Fieldset({ legend, children }: { legend: string; children: ReactNode }) {
   return (
     <fieldset className="space-y-4 rounded-lg border border-stone-200 bg-white p-5">
-      <legend className="px-1 text-sm font-semibold uppercase tracking-wide text-stone-600">{legend}</legend>
+      <legend className="px-1 text-sm font-semibold uppercase tracking-wide text-brand-navy">{legend}</legend>
       {children}
     </fieldset>
   );

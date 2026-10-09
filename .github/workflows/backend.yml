@@ -1,0 +1,42 @@
+name: Backend
+
+on:
+  pull_request:
+    paths: ["backend/**", "frontend/**", "templates/**", "Dockerfile", ".dockerignore", ".github/workflows/backend.yml"]
+  push:
+    branches: [main]
+    paths: ["backend/**", "frontend/**", "templates/**", "Dockerfile", ".dockerignore", ".github/workflows/backend.yml"]
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: uv sync --locked
+      - run: uv run pytest
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t prelegal .
+      - name: Smoke test the container
+        run: |
+          docker run -d --name prelegal -p 8000:8000 prelegal
+          for i in $(seq 1 30); do curl -sf localhost:8000/api/health && break; sleep 1; done
+          curl -sf localhost:8000/api/health
+          # Capture pages before grepping: grep -q exiting early would break curl's pipe under pipefail.
+          login=$(curl -sf localhost:8000/)
+          nda=$(curl -sf localhost:8000/nda/)
+          grep -q "<title>Sign in | Prelegal</title>" <<<"$login"
+          grep -q "<title>Mutual NDA Creator | Prelegal</title>" <<<"$nda"

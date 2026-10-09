@@ -1,23 +1,12 @@
 import { readFile } from "node:fs/promises";
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { extractPdfPages } from "../src/test/pdf-text";
+import { failOnPageErrors, scanA11y } from "./helpers";
 
 const preview = (page: Page) => page.getByRole("region", { name: "Agreement preview" });
 const group = (page: Page, name: string) => page.getByRole("group", { name });
 
-// Fail any test whose page logs an error, e.g. a hydration mismatch or a crash.
-let pageErrors: string[];
-test.beforeEach(({ page }) => {
-  pageErrors = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") pageErrors.push(message.text());
-  });
-});
-test.afterEach(() => {
-  expect(pageErrors).toEqual([]);
-});
+failOnPageErrors();
 
 async function fillAgreement(page: Page) {
   await page.getByLabel("Purpose").fill("Evaluating a joint product launch.");
@@ -48,7 +37,7 @@ async function downloadPdf(page: Page) {
 
 test("loads the creator with the template defaults", async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 9, 4, 12));
-  await page.goto("/");
+  await page.goto("/nda/");
 
   await expect(page).toHaveTitle("Mutual NDA Creator | Prelegal");
   await expect(page.getByRole("heading", { level: 1, name: "Mutual NDA Creator" })).toBeVisible();
@@ -60,7 +49,7 @@ test("loads the creator with the template defaults", async ({ page }) => {
 });
 
 test("fills the agreement, previews it live and downloads a matching PDF", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/nda/");
   await fillAgreement(page);
 
   const doc = preview(page);
@@ -96,7 +85,7 @@ test("fills the agreement, previews it live and downloads a matching PDF", async
 });
 
 test("downloads a PDF with placeholders when nothing is filled in", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/nda/");
   const { filename, pages } = await downloadPdf(page);
 
   expect(filename).toBe("Mutual-NDA.pdf");
@@ -104,7 +93,7 @@ test("downloads a PDF with placeholders when nothing is filled in", async ({ pag
 });
 
 test("switches term options and flags invalid years", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/nda/");
   const mndaTerm = group(page, "MNDA Term");
   const years = page.getByLabel("MNDA Term in years");
 
@@ -124,7 +113,7 @@ test("switches term options and flags invalid years", async ({ page }) => {
 });
 
 test("remembers years across term switches and explains invalid values", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/nda/");
   const term = group(page, "MNDA Term");
   const years = page.getByLabel("MNDA Term in years");
 
@@ -141,7 +130,7 @@ test("remembers years across term switches and explains invalid values", async (
 });
 
 test("handles long and non-Latin input without breaking the layout", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/nda/");
   const party1 = group(page, "Party 1");
   await party1.getByLabel("Notice address").fill(`${"a".repeat(80)}@example.com`);
   await party1.getByLabel("Company").fill("Łódź Sp. z o.o.");
@@ -158,9 +147,11 @@ test("handles long and non-Latin input without breaking the layout", async ({ pa
 });
 
 test("is operable with the keyboard alone", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/nda/");
 
-  // The first Tab lands on the first form field.
+  // After the header's last control, Tab lands on the first form field.
+  // (The header link is not asserted: WebKit, like Safari, skips links when tabbing.)
+  await page.getByRole("link", { name: "Sign in" }).focus();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Purpose")).toBeFocused();
 
@@ -179,24 +170,21 @@ test("is operable with the keyboard alone", async ({ page }) => {
 });
 
 test.describe("accessibility", () => {
-  const scan = (page: Page) =>
-    new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-
   test("has no WCAG A/AA violations in the default state", async ({ page }) => {
-    await page.goto("/");
-    expect((await scan(page)).violations).toEqual([]);
+    await page.goto("/nda/");
+    expect((await scanA11y(page)).violations).toEqual([]);
   });
 
   test("has no WCAG A/AA violations with alternative options selected and values filled", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/nda/");
     await fillAgreement(page);
     await group(page, "MNDA Term").getByLabel("Continues until terminated").check();
-    expect((await scan(page)).violations).toEqual([]);
+    expect((await scanA11y(page)).violations).toEqual([]);
   });
 });
 
 test("fits the viewport without horizontal scrolling", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/nda/");
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
