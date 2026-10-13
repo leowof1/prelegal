@@ -5,14 +5,22 @@ import pytest
 from prelegal_backend.db import connect, reset_database
 
 
-def columns(db_path):
+def columns(db_path, table):
     with connect(db_path) as conn:
-        return [row[1] for row in conn.execute("PRAGMA table_info(users)")]
+        return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
 
 
 def test_reset_creates_users_table(db_path):
     reset_database(db_path)
-    assert columns(db_path) == ["id", "name", "email", "password_hash", "created_at"]
+    assert columns(db_path, "users") == ["id", "name", "email", "password_hash", "created_at"]
+
+
+def test_reset_creates_sessions_and_documents_tables(db_path):
+    reset_database(db_path)
+    assert columns(db_path, "sessions") == ["token", "user_id", "created_at"]
+    assert columns(db_path, "documents") == [
+        "id", "user_id", "document_id", "values_json", "messages_json", "created_at", "updated_at"
+    ]
 
 
 def test_reset_discards_existing_data(db_path):

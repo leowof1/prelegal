@@ -1,7 +1,8 @@
 """JSON API routes, mounted under /api."""
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
+from prelegal_backend.auth import current_user
 from prelegal_backend.chat import ChatReply, ChatRequest, chat
 from prelegal_backend.db import connect
 
@@ -16,7 +17,7 @@ def health(request: Request) -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.post("/chat")
+@router.post("/chat", dependencies=[Depends(current_user)])
 def post_chat(request: ChatRequest) -> ChatReply:
     """Return the assistant's reply and the updated document values."""
     return chat(request)
