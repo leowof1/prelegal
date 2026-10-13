@@ -2,8 +2,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { WireValues } from "@/lib/nda/chat";
 import { loadNdaTemplate } from "@/lib/nda/template";
 import type { Block } from "@/lib/nda/types";
+import { filledValues } from "@/test/fixtures";
+import { GREETING } from "./NdaChat";
 import { NdaCreator } from "./NdaCreator";
 
 const renderNdaPdf = vi.fn<(blocks: Block[]) => Promise<Blob>>();
@@ -11,12 +14,32 @@ vi.mock("./nda-pdf", () => ({ renderNdaPdf: (blocks: Block[]) => renderNdaPdf(bl
 
 const template = loadNdaTemplate();
 
+interface ChatBody {
+  messages: { role: string; content: string }[];
+  values: WireValues;
+}
+
+/** Stubs /api/chat: each call replies with `reply` and the sent values updated by `update`. */
+function stubChat(reply: string, update: (values: WireValues) => WireValues = (v) => v) {
+  const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+    const body: ChatBody = JSON.parse(init.body as string);
+    return Response.json({ reply, values: update(body.values) });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const bodies = () => fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string) as ChatBody);
+  return { fetchMock, bodies };
+}
+
 function setup() {
   const user = userEvent.setup();
   render(<NdaCreator template={template} />);
   const preview = within(screen.getByRole("region", { name: "Agreement preview" }));
-  const group = (name: string) => within(screen.getByRole("group", { name }));
-  return { user, preview, group };
+  const log = within(screen.getByRole("log", { name: "Conversation" }));
+  async function say(text: string) {
+    await user.type(screen.getByRole("textbox", { name: "Message" }), text);
+    await user.click(screen.getByRole("button", { name: "Send" }));
+  }
+  return { user, preview, log, say };
 }
 
 beforeEach(() => {
@@ -34,14 +57,12 @@ describe("NdaCreator defaults", () => {
   it("prefills the template defaults and today's date", () => {
     const { preview } = setup();
 
-    expect(screen.getByLabelText("Effective Date")).toHaveValue("2026-10-04");
-    expect(screen.getByLabelText("Purpose")).toHaveValue(
-      "Evaluating whether to enter into a business relationship with the other party.",
-    );
+    expect(preview.getByText("Evaluating whether to enter into a business relationship with the other party.")).toBeInTheDocument();
     expect(preview.getByText("October 4, 2026")).toBeInTheDocument();
     expect(preview.getByText("Expires 1 year from Effective Date.")).toBeInTheDocument();
     expect(preview.getByText(/^1 year from Effective Date, but in the case of trade secrets/)).toBeInTheDocument();
     expect(preview.getByText("None.")).toBeInTheDocument();
+    expect(preview.getByText("[State]")).toHaveClass("bg-amber-100");
   });
 
   it("renders the full Standard Terms and attribution from the templates", () => {
@@ -53,174 +74,141 @@ describe("NdaCreator defaults", () => {
   });
 });
 
-describe("NdaCreator live preview", () => {
-  it("fills the signature table as party details are typed", async () => {
-    const { user, preview, group } = setup();
+describe("NdaCreator chat", () => {
+  it("greets the user without calling the AI", () => {
+    const { fetchMock } = stubChat("unused");
+    const { log } = setup();
 
-    await user.type(group("Party 1").getByLabelText("Company"), "Acme Inc");
-    await user.type(group("Party 1").getByLabelText("Signer name"), "Ada Lovelace");
-    await user.type(group("Party 2").getByLabelText("Company"), "Globex LLC");
-    await user.type(group("Party 2").getByLabelText("Notice address"), "alan@globex.test");
+    expect(log.getByText(GREETING)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
+  it("sends the conversation with the current values and fills the preview from the reply", async () => {
+    const { bodies } = stubChat("Which state's law should govern?", (v) => ({
+      ...v,
+      parties: [
+        { ...v.parties[0], company: "Acme Inc" },
+        { ...v.parties[1], company: "Globex LLC" },
+      ],
+    }));
+    const { preview, log, say } = setup();
+
+    await say("Acme Inc and Globex LLC");
+
+    expect(await log.findByText("Which state's law should govern?")).toBeInTheDocument();
+    expect(log.getByText("Acme Inc and Globex LLC")).toBeInTheDocument();
     const companyRow = preview.getByRole("rowheader", { name: "Company" }).closest("tr")!;
-    expect(within(companyRow).getAllByRole("cell").map((cell) => cell.textContent)).toEqual([
-      "Acme Inc",
-      "Globex LLC",
+    expect(within(companyRow).getAllByRole("cell").map((cell) => cell.textContent)).toEqual(["Acme Inc", "Globex LLC"]);
+
+    const [body] = bodies();
+    expect(body.messages).toEqual([
+      { role: "assistant", content: GREETING },
+      { role: "user", content: "Acme Inc and Globex LLC" },
     ]);
-    expect(preview.getByText("Ada Lovelace")).toBeInTheDocument();
-    expect(preview.getByText("alan@globex.test")).toBeInTheDocument();
+    expect(body.values.effectiveDate).toBe("2026-10-04");
   });
 
-  it("highlights missing values and clears the highlight once filled", async () => {
-    const { user, preview } = setup();
+  it("sends the values updated by the previous reply on the next turn", async () => {
+    const { bodies } = stubChat("Noted.", (v) => ({ ...v, governingLaw: "Delaware" }));
+    const { log, say } = setup();
 
-    const placeholder = preview.getByText("[State]");
-    expect(placeholder).toHaveClass("bg-amber-100");
+    await say("Delaware law");
+    await log.findByText("Noted.");
+    await say("Courts in Wilmington");
+    await waitFor(() => expect(bodies()).toHaveLength(2));
 
-    await user.type(screen.getByLabelText("Governing Law"), "Delaware");
-
-    expect(preview.queryByText("[State]")).not.toBeInTheDocument();
-    expect(preview.getByText("Delaware")).not.toHaveClass("bg-amber-100");
+    expect(bodies()[1].values.governingLaw).toBe("Delaware");
+    expect(bodies()[1].messages.map((m) => m.content)).toEqual([GREETING, "Delaware law", "Noted.", "Courts in Wilmington"]);
   });
 
-  it("formats a changed effective date and flags a cleared one", async () => {
-    const { user, preview } = setup();
-    const input = screen.getByLabelText("Effective Date");
+  it("shows open-ended terms from the reply", async () => {
+    stubChat("Done.", (v) => ({
+      ...v,
+      mndaTerm: { kind: "untilTerminated", years: null },
+      confidentialityTerm: { kind: "perpetual", years: null },
+    }));
+    const { preview, log, say } = setup();
 
-    await user.clear(input);
-    expect(preview.getByText("[Effective Date]")).toBeInTheDocument();
+    await say("No end date, and keep it confidential forever");
+    await log.findByText("Done.");
 
-    await user.type(input, "2027-01-15");
-    expect(preview.getByText("January 15, 2027")).toBeInTheDocument();
-  });
-
-  it("switches the MNDA term between a fixed number of years and until terminated", async () => {
-    const { user, preview, group } = setup();
-    const term = group("MNDA Term");
-    const years = term.getByLabelText("MNDA Term in years");
-
-    await user.click(term.getByLabelText("Continues until terminated"));
     expect(preview.getByText("Continues until terminated in accordance with the terms of the MNDA.")).toBeInTheDocument();
-    expect(years).toBeDisabled();
-
-    await user.click(term.getByRole("radio", { name: "A fixed number of years" }));
-    expect(years).toBeEnabled();
-    expect(preview.getByText("Expires 1 year from Effective Date.")).toBeInTheDocument();
-  });
-
-  it("updates the number of years and flags an empty value", async () => {
-    const { user, preview } = setup();
-    const years = screen.getByLabelText("MNDA Term in years");
-
-    await user.clear(years);
-    expect(preview.getByText("[Number of years]")).toBeInTheDocument();
-
-    await user.type(years, "3");
-    expect(preview.getByText("Expires 3 years from Effective Date.")).toBeInTheDocument();
-  });
-
-  it.each([
-    ["MNDA Term", "Continues until terminated", "Expires 3 years from Effective Date."],
-    ["Term of Confidentiality", "In perpetuity", /^3 years from Effective Date, but/],
-  ])("remembers the %s years when switching to the alternative and back", async (legend, alternative, expected) => {
-    const { user, preview, group } = setup();
-    const term = group(legend);
-    const years = term.getByLabelText(`${legend} in years`);
-
-    await user.clear(years);
-    await user.type(years, "3");
-    await user.click(term.getByLabelText(alternative));
-    expect(years).toBeDisabled();
-    expect(years).toHaveValue(3);
-
-    await user.click(term.getByRole("radio", { name: "A fixed number of years" }));
-    expect(years).toBeEnabled();
-    expect(years).toHaveValue(3);
-    expect(preview.getByText(expected)).toBeInTheDocument();
-  });
-
-  it("keeps the two term choices independent", async () => {
-    const { user, preview, group } = setup();
-
-    await user.click(group("MNDA Term").getByLabelText("Continues until terminated"));
-
-    expect(group("Term of Confidentiality").getByRole("radio", { name: "A fixed number of years" })).toBeChecked();
-    expect(preview.getByText(/^1 year from Effective Date, but/)).toBeInTheDocument();
-  });
-
-  it.each(["0", "-1", "2.5", "101"])("flags %s years as invalid in the form and the document", async (input) => {
-    const { user, preview } = setup();
-    const years = screen.getByLabelText("MNDA Term in years");
-
-    await user.clear(years);
-    await user.type(years, input);
-
-    expect(years).toHaveValue(Number(input));
-    expect(years).toHaveAttribute("aria-invalid", "true");
-    expect(years).toHaveAccessibleDescription("Enter a whole number of years from 1 to 100.");
-    expect(preview.getByText("[Number of years]")).toBeInTheDocument();
-  });
-
-  it("does not flag an empty years field while its alternative is selected", async () => {
-    const { user, group } = setup();
-    const term = group("MNDA Term");
-    const years = term.getByLabelText("MNDA Term in years");
-
-    await user.clear(years);
-    await user.click(term.getByLabelText("Continues until terminated"));
-
-    expect(years).toHaveAttribute("aria-invalid", "false");
-    expect(screen.queryByText(/Enter a whole number of years/)).not.toBeInTheDocument();
-  });
-
-  it("supports a perpetual term of confidentiality", async () => {
-    const { user, preview, group } = setup();
-
-    await user.click(group("Term of Confidentiality").getByLabelText("In perpetuity"));
-
     expect(preview.getByText("In perpetuity.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Term of Confidentiality in years")).toBeDisabled();
   });
 
-  it("preserves line breaks in modifications", async () => {
-    const { user, preview } = setup();
+  it("shows a thinking indicator and blocks sending while waiting", async () => {
+    let respond!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((r) => (respond = r))));
+    const { user, log, say } = setup();
 
-    await user.type(screen.getByLabelText("MNDA Modifications"), "First change.{Enter}Second change.");
+    await say("Hello");
 
-    const value = preview.getByText(/First change\./);
-    expect(value.textContent).toBe("First change.\nSecond change.");
-    expect(value).toHaveClass("whitespace-pre-line");
+    expect(log.getByText("Thinking…")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "Message" }), "Again");
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+
+    respond(Response.json({ reply: "Hi there.", values: filledValues() }));
+    expect(await log.findByText("Hi there.")).toBeInTheDocument();
+    expect(log.queryByText("Thinking…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+  });
+
+  it("disables Send for an empty message", async () => {
+    const { user } = setup();
+    const send = screen.getByRole("button", { name: "Send" });
+
+    expect(send).toBeDisabled();
+    await user.type(screen.getByRole("textbox", { name: "Message" }), "   ");
+    expect(send).toBeDisabled();
+  });
+
+  it("shows an error, keeps the values and restores the message when the AI fails, then recovers", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 500 })));
+    const { user, preview, log, say } = setup();
+
+    await say("Delaware law");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not respond");
+    expect(consoleError).toHaveBeenCalled();
+    expect(log.queryByText("Delaware law")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Delaware law");
+    expect(preview.getByText("[State]")).toBeInTheDocument();
+
+    const { bodies } = stubChat("Noted.", (v) => ({ ...v, governingLaw: "Delaware" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await log.findByText("Noted.")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(preview.getByText("Delaware")).toBeInTheDocument();
+    expect(bodies()[0].messages.map((m) => m.content)).toEqual([GREETING, "Delaware law"]);
   });
 });
 
-describe("NdaCreator user input safety", () => {
-  it("renders typed markup literally in the preview", async () => {
-    const { user, preview, group } = setup();
+describe("NdaCreator AI output safety", () => {
+  it("renders markup from the AI literally in the preview and the chat", async () => {
     const markup = "**bold** [x](https://evil.test) <b>tag</b>";
+    stubChat(`<i>${markup}</i>`, (v) => ({ ...v, purpose: markup }));
+    const { preview, log, say } = setup();
 
-    await user.clear(screen.getByLabelText("Purpose"));
-    // user-event treats "[" and "{" as key descriptors; doubling them types them literally.
-    await user.type(screen.getByLabelText("Purpose"), markup.replace(/[[{]/g, "$&$&"));
-    await user.type(group("Party 1").getByLabelText("Company"), "<i>Acme</i>");
+    await say("Hi");
 
+    expect(await log.findByText(`<i>${markup}</i>`)).toBeInTheDocument();
     expect(preview.getByText(markup)).toBeInTheDocument();
-    expect(preview.getByText("<i>Acme</i>")).toBeInTheDocument();
     expect(preview.queryByRole("link", { name: "x" })).not.toBeInTheDocument();
     expect(preview.queryByText("bold", { selector: "strong" })).not.toBeInTheDocument();
   });
 
   it("warns about characters the PDF cannot display", async () => {
-    const { user, group } = setup();
+    stubChat("Noted.", (v) => ({ ...v, parties: [v.parties[0], { ...v.parties[1], company: "Łódź Müller" }] }));
+    const { log, say } = setup();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
-    await user.type(group("Party 2").getByLabelText("Company"), "Łódź Müller");
+    await say("The other party is Łódź Müller");
+    await log.findByText("Noted.");
 
     expect(screen.getByRole("status")).toHaveTextContent("can't display these characters");
     expect(screen.getByRole("status")).toHaveTextContent("Ł ź");
     expect(screen.getByRole("status")).not.toHaveTextContent("ü");
-
-    await user.clear(group("Party 2").getByLabelText("Company"));
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });
 
@@ -243,18 +231,19 @@ describe("NdaCreator PDF download", () => {
     Reflect.deleteProperty(URL, "revokeObjectURL");
   });
 
-  it("renders the current document and downloads it with a party-based filename", async () => {
+  it("renders the chat-filled document and downloads it with a party-based filename", async () => {
     let resolve!: (blob: Blob) => void;
     renderNdaPdf.mockReturnValue(new Promise((r) => (resolve = r)));
-    const { user, group } = setup();
-    await user.type(group("Party 1").getByLabelText("Company"), "Acme Inc");
+    stubChat("Noted.", (v) => ({ ...v, parties: [{ ...v.parties[0], company: "Acme Inc" }, v.parties[1]] }));
+    const { user, log, say } = setup();
+    await say("Acme Inc");
+    await log.findByText("Noted.");
 
     await user.click(screen.getByRole("button", { name: "Download PDF" }));
 
     const busy = screen.getByRole("button", { name: "Preparing PDF…" });
     expect(busy).toBeDisabled();
-    const blocks = renderNdaPdf.mock.calls[0][0];
-    expect(JSON.stringify(blocks)).toContain("Acme Inc");
+    expect(JSON.stringify(renderNdaPdf.mock.calls[0][0])).toContain("Acme Inc");
 
     resolve(new Blob(["%PDF-"], { type: "application/pdf" }));
 
@@ -282,27 +271,21 @@ describe("NdaCreator PDF download", () => {
 });
 
 describe("NdaCreator accessibility semantics", () => {
-  it("names every form control and links hints as descriptions", () => {
-    setup();
+  it("names the message box and labels who said what", async () => {
+    stubChat("Noted.");
+    const { log, say } = setup();
 
-    for (const input of [...screen.getAllByRole("textbox"), ...screen.getAllByRole("spinbutton")]) {
-      expect(input).toHaveAccessibleName();
-    }
-    expect(screen.getByLabelText("Governing Law")).toHaveAccessibleDescription(
-      "State whose laws govern the MNDA, e.g. Delaware",
-    );
+    expect(screen.getByRole("textbox", { name: "Message" })).toBeInTheDocument();
+    await say("Hello");
+    await log.findByText("Noted.");
+
+    expect(log.getAllByText("Assistant:")).toHaveLength(2);
+    expect(log.getAllByText("You:")).toHaveLength(1);
   });
 
-  it("groups each term choice under its legend", () => {
-    const { group } = setup();
-
-    for (const name of ["MNDA Term", "Term of Confidentiality"]) {
-      expect(group(name).getAllByRole("radio")).toHaveLength(2);
-    }
-  });
-
-  it("makes the scrollable preview keyboard focusable", () => {
+  it("makes the scrollable conversation and preview keyboard focusable", () => {
     setup();
+    expect(screen.getByRole("log", { name: "Conversation" })).toHaveAttribute("tabindex", "0");
     expect(screen.getByRole("region", { name: "Agreement preview" })).toHaveAttribute("tabindex", "0");
   });
 });

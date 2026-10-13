@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { buildNdaDocument, defaultNdaValues, pdfFilename, todayIso } from "@/lib/nda/build";
 import { unsupportedPdfCharacters } from "@/lib/nda/pdf-charset";
 import type { NdaTemplate, NdaValues } from "@/lib/nda/types";
-import { NdaForm } from "./NdaForm";
+import { NdaChat } from "./NdaChat";
 import { NdaPreview } from "./NdaPreview";
 import { submitButtonClass } from "@/components/ui/styles";
 
@@ -51,8 +51,8 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-      <section aria-label="NDA details">
-        <NdaForm values={values} onChange={setEdited} />
+      <section aria-label="NDA chat">
+        <NdaChat values={values} onChange={setEdited} />
       </section>
 
       <section className="space-y-4 lg:sticky lg:top-6 lg:self-start">

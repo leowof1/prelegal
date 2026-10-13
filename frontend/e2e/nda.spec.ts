@@ -1,30 +1,49 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { GREETING } from "../src/components/nda/NdaChat";
+import type { WireValues } from "../src/lib/nda/chat";
 import { extractPdfPages } from "../src/test/pdf-text";
 import { failOnPageErrors, scanA11y } from "./helpers";
 
 const preview = (page: Page) => page.getByRole("region", { name: "Agreement preview" });
-const group = (page: Page, name: string) => page.getByRole("group", { name });
+const conversation = (page: Page) => page.getByRole("log", { name: "Conversation" });
 
 failOnPageErrors();
 
+const AGREEMENT: WireValues = {
+  purpose: "Evaluating a joint product launch.",
+  effectiveDate: "2027-01-15",
+  mndaTerm: { kind: "expires", years: 2 },
+  confidentialityTerm: { kind: "perpetual", years: null },
+  governingLaw: "Delaware",
+  jurisdiction: "courts located in New Castle, DE",
+  modifications: "Section 9 applies to both parties.",
+  parties: [
+    { name: "Ada Lovelace", title: "CEO", company: "Acme Inc", noticeAddress: "ada@acme.test" },
+    { name: "Alan Turing", title: "CTO", company: "Globex LLC", noticeAddress: "alan@globex.test" },
+  ],
+};
+
+/** Stubs the AI: every message is answered with `reply` and the sent values updated by `update`. */
+async function stubChat(page: Page, reply: string, update: (values: WireValues) => WireValues) {
+  const requests: { messages: unknown[]; values: WireValues }[] = [];
+  await page.route("**/api/chat", async (route) => {
+    const body = route.request().postDataJSON();
+    requests.push(body);
+    await route.fulfill({ json: { reply, values: update(body.values) } });
+  });
+  return requests;
+}
+
+async function say(page: Page, text: string, expectedReply: string) {
+  await page.getByRole("textbox", { name: "Message" }).fill(text);
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(conversation(page).getByText(expectedReply)).toBeVisible();
+}
+
 async function fillAgreement(page: Page) {
-  await page.getByLabel("Purpose").fill("Evaluating a joint product launch.");
-  await page.getByLabel("Effective Date").fill("2027-01-15");
-  await page.getByLabel("MNDA Term in years").fill("2");
-  await group(page, "Term of Confidentiality").getByLabel("In perpetuity").check();
-  await page.getByLabel("Governing Law").fill("Delaware");
-  await page.getByLabel("Jurisdiction").fill("courts located in New Castle, DE");
-  await page.getByLabel("MNDA Modifications").fill("Section 9 applies to both parties.");
-  const parties = [
-    { Company: "Acme Inc", "Signer name": "Ada Lovelace", Title: "CEO", "Notice address": "ada@acme.test" },
-    { Company: "Globex LLC", "Signer name": "Alan Turing", Title: "CTO", "Notice address": "alan@globex.test" },
-  ];
-  for (const [index, fields] of parties.entries()) {
-    for (const [label, value] of Object.entries(fields)) {
-      await group(page, `Party ${index + 1}`).getByLabel(label).fill(value);
-    }
-  }
+  await stubChat(page, "Your NDA is ready to download.", () => AGREEMENT);
+  await say(page, "Acme and Globex, launching a product together.", "Your NDA is ready to download.");
 }
 
 async function downloadPdf(page: Page) {
@@ -35,20 +54,39 @@ async function downloadPdf(page: Page) {
   return { filename: download.suggestedFilename(), pages };
 }
 
-test("loads the creator with the template defaults", async ({ page }) => {
+test("loads the creator with the template defaults and a greeting", async ({ page }) => {
+  let chatCalls = 0;
+  await page.route("**/api/chat", (route) => (chatCalls++, route.abort()));
   await page.clock.setFixedTime(new Date(2026, 9, 4, 12));
   await page.goto("/nda/");
 
   await expect(page).toHaveTitle("Mutual NDA Creator | Prelegal");
   await expect(page.getByRole("heading", { level: 1, name: "Mutual NDA Creator" })).toBeVisible();
-  await expect(page.getByLabel("Effective Date")).toHaveValue("2026-10-04");
+  await expect(conversation(page).getByText(GREETING)).toBeVisible();
   await expect(preview(page).getByText("October 4, 2026")).toBeVisible();
   await expect(preview(page).getByText("Expires 1 year from Effective Date.")).toBeVisible();
   await expect(preview(page).getByText("[State]")).toBeVisible();
   await expect(preview(page).getByText("11. General.", { exact: false })).toBeAttached();
+  expect(chatCalls).toBe(0);
 });
 
-test("fills the agreement, previews it live and downloads a matching PDF", async ({ page }) => {
+test("sends the conversation and today's values to the AI", async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 9, 4, 12));
+  const requests = await stubChat(page, "Which state's law applies?", (v) => ({ ...v, governingLaw: "Delaware" }));
+  await page.goto("/nda/");
+
+  await say(page, "Delaware law please", "Which state's law applies?");
+
+  await expect(preview(page).getByText("Delaware", { exact: true })).toBeVisible();
+  expect(requests).toHaveLength(1);
+  expect(requests[0].messages).toEqual([
+    { role: "assistant", content: GREETING },
+    { role: "user", content: "Delaware law please" },
+  ]);
+  expect(requests[0].values.effectiveDate).toBe("2026-10-04");
+});
+
+test("fills the agreement from the chat and downloads a matching PDF", async ({ page }) => {
   await page.goto("/nda/");
   await fillAgreement(page);
 
@@ -92,48 +130,22 @@ test("downloads a PDF with placeholders when nothing is filled in", async ({ pag
   expect(pages[0]).toContain("Governing Law: [State]");
 });
 
-test("switches term options and flags invalid years", async ({ page }) => {
+test("shows an open-ended MNDA term from the chat", async ({ page }) => {
+  await stubChat(page, "Noted.", (v) => ({ ...v, mndaTerm: { kind: "untilTerminated", years: null } }));
   await page.goto("/nda/");
-  const mndaTerm = group(page, "MNDA Term");
-  const years = page.getByLabel("MNDA Term in years");
 
-  // The years box stays compact so its label fits beside it.
-  expect((await years.boundingBox())!.width).toBeLessThan(120);
+  await say(page, "No end date", "Noted.");
 
-  await mndaTerm.getByLabel("Continues until terminated").check();
   await expect(preview(page).getByText("Continues until terminated in accordance with the terms of the MNDA.")).toBeVisible();
-  await expect(years).toBeDisabled();
-
-  await mndaTerm.getByRole("radio", { name: "A fixed number of years" }).check();
-  await expect(years).toBeEnabled();
-  await years.fill("");
-  await expect(preview(page).getByText("[Number of years]")).toBeVisible();
-  await years.fill("5");
-  await expect(preview(page).getByText("Expires 5 years from Effective Date.")).toBeVisible();
-});
-
-test("remembers years across term switches and explains invalid values", async ({ page }) => {
-  await page.goto("/nda/");
-  const term = group(page, "MNDA Term");
-  const years = page.getByLabel("MNDA Term in years");
-
-  await years.fill("4");
-  await term.getByLabel("Continues until terminated").check();
-  await term.getByRole("radio", { name: "A fixed number of years" }).check();
-  await expect(years).toHaveValue("4");
-  await expect(preview(page).getByText("Expires 4 years from Effective Date.")).toBeVisible();
-
-  await years.fill("0");
-  await expect(years).toHaveValue("0");
-  await expect(page.getByText("Enter a whole number of years from 1 to 100.")).toBeVisible();
-  await expect(preview(page).getByText("[Number of years]")).toBeVisible();
 });
 
 test("handles long and non-Latin input without breaking the layout", async ({ page }) => {
+  await stubChat(page, "Noted.", (v) => ({
+    ...v,
+    parties: [{ ...v.parties[0], company: "Łódź Sp. z o.o.", noticeAddress: `${"a".repeat(80)}@example.com` }, v.parties[1]],
+  }));
   await page.goto("/nda/");
-  const party1 = group(page, "Party 1");
-  await party1.getByLabel("Notice address").fill(`${"a".repeat(80)}@example.com`);
-  await party1.getByLabel("Company").fill("Łódź Sp. z o.o.");
+  await say(page, "We are Łódź Sp. z o.o.", "Noted.");
 
   // The preview's table cell wraps the long address instead of widening the document.
   const region = preview(page);
@@ -147,13 +159,22 @@ test("handles long and non-Latin input without breaking the layout", async ({ pa
 });
 
 test("is operable with the keyboard alone", async ({ page }) => {
+  await stubChat(page, "Noted.", (v) => ({ ...v, governingLaw: "Delaware" }));
   await page.goto("/nda/");
 
-  // After the header's last control, Tab lands on the first form field.
+  // After the header's last control, Tab reaches the conversation and then the message box.
   // (The header link is not asserted: WebKit, like Safari, skips links when tabbing.)
   await page.getByRole("link", { name: "Sign in" }).focus();
   await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Purpose")).toBeFocused();
+  await expect(conversation(page)).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("textbox", { name: "Message" })).toBeFocused();
+
+  // Enter sends the message.
+  await page.keyboard.type("Delaware law");
+  await page.keyboard.press("Enter");
+  await expect(conversation(page).getByText("Noted.")).toBeVisible();
+  await expect(preview(page).getByText("Delaware", { exact: true })).toBeVisible();
 
   // The scrollable preview can be focused and scrolled with the keyboard.
   const region = preview(page);
@@ -175,10 +196,9 @@ test.describe("accessibility", () => {
     expect((await scanA11y(page)).violations).toEqual([]);
   });
 
-  test("has no WCAG A/AA violations with alternative options selected and values filled", async ({ page }) => {
+  test("has no WCAG A/AA violations after a conversation fills the agreement", async ({ page }) => {
     await page.goto("/nda/");
     await fillAgreement(page);
-    await group(page, "MNDA Term").getByLabel("Continues until terminated").check();
     expect((await scanA11y(page)).violations).toEqual([]);
   });
 });
@@ -191,13 +211,13 @@ test("fits the viewport without horizontal scrolling", async ({ page }) => {
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
-  // The form comes before the preview in reading order at every width.
-  const formBox = await page.getByRole("group", { name: "Agreement" }).boundingBox();
+  // The chat comes before the preview in reading order at every width.
+  const chatBox = await conversation(page).boundingBox();
   const previewBox = await preview(page).boundingBox();
-  expect(formBox && previewBox).toBeTruthy();
+  expect(chatBox && previewBox).toBeTruthy();
   if ((page.viewportSize()?.width ?? 0) < 1024) {
-    expect(previewBox!.y).toBeGreaterThan(formBox!.y);
+    expect(previewBox!.y).toBeGreaterThan(chatBox!.y);
   } else {
-    expect(previewBox!.x).toBeGreaterThan(formBox!.x);
+    expect(previewBox!.x).toBeGreaterThan(chatBox!.x);
   }
 });
