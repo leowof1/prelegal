@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from prelegal_backend import auth, saved_documents
 from prelegal_backend.api import router
 from prelegal_backend.db import reset_database
 
@@ -23,6 +24,8 @@ def create_app(db_path: Path, static_dir: Path) -> FastAPI:
 
     app = FastAPI(title="Prelegal", lifespan=lifespan)
     app.state.db_path = db_path
+    app.include_router(auth.router)
+    app.include_router(saved_documents.router)
     app.include_router(router)
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
     return app

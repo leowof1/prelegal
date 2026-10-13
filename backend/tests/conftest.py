@@ -24,3 +24,17 @@ def db_path(tmp_path):
 def client(db_path, static_dir):
     with TestClient(create_app(db_path=db_path, static_dir=static_dir)) as client:
         yield client
+
+
+def sign_up(client, email="ada@acme.test", name="Ada Lovelace", password="correct horse"):
+    """Register an account through the API; the client keeps its session cookie."""
+    response = client.post("/api/auth/signup", json={"name": name, "email": email, "password": password})
+    assert response.status_code == 201
+    return response.json()
+
+
+@pytest.fixture
+def signed_in(client):
+    """A client signed in as a freshly registered user."""
+    sign_up(client)
+    return client

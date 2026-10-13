@@ -5,8 +5,11 @@ import type { ReactNode } from "react";
 export function AppHeader({ children }: { children?: ReactNode }) {
   return (
     <header className="border-b-4 border-brand-yellow bg-brand-navy">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="text-xl font-bold tracking-tight text-white">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-4 sm:px-6 lg:px-8">
+        <Link
+          href="/"
+          className="rounded text-xl font-bold tracking-tight text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow"
+        >
           Prelegal<span className="text-brand-yellow">.</span>
         </Link>
         {children}

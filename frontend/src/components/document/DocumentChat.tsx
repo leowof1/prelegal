@@ -3,20 +3,25 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { type ChatMessage, sendChat } from "@/lib/document/chat";
 import type { DocumentValues } from "@/lib/document/types";
-import { inputClass, submitButtonClass } from "@/components/ui/styles";
+import { cardClass, inputClass, submitButtonClass } from "@/components/ui/styles";
 
 export const GREETING =
   "Hi! I'll help you draft a legal agreement, such as an NDA, a cloud service agreement or a pilot agreement. What would you like to create, and who are the parties?";
 
-/** Freeform AI chat that picks the document and fills in its values as the conversation goes. */
+/**
+ * Freeform AI chat that picks the document and fills in its values as the conversation goes.
+ * After each reply, `onReply` gets the whole conversation and the updated values; the chat waits for it.
+ */
 export function DocumentChat({
   values,
-  onChange,
+  initialMessages,
+  onReply,
 }: {
   values: DocumentValues;
-  onChange: (values: DocumentValues) => void;
+  initialMessages?: ChatMessage[];
+  onReply: (messages: ChatMessage[], values: DocumentValues) => Promise<void>;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: GREETING }]);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages ?? [{ role: "assistant", content: GREETING }]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +43,9 @@ export function DocumentChat({
     setError(null);
     try {
       const result = await sendChat(history, values);
-      setMessages([...history, { role: "assistant", content: result.reply }]);
-      onChange(result.values);
+      const conversation: ChatMessage[] = [...history, { role: "assistant", content: result.reply }];
+      setMessages(conversation);
+      await onReply(conversation, result.values);
     } catch (err) {
       console.error(err);
       // Put the message back in the box so retrying does not repeat it in the conversation.
@@ -52,7 +58,7 @@ export function DocumentChat({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+    <div className={`flex flex-col gap-4 p-5 ${cardClass}`}>
       <h2 className="text-lg font-semibold text-brand-navy">Chat with the AI assistant</h2>
       <div
         ref={logRef}
@@ -86,6 +92,8 @@ export function DocumentChat({
           placeholder="Type your answer…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          // A reopened conversation continues where it left off.
+          autoFocus={initialMessages !== undefined}
           className={inputClass}
         />
         <button type="submit" disabled={pending || !input.trim()} className={`${submitButtonClass} disabled:opacity-60`}>
