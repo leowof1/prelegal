@@ -2,10 +2,10 @@ name: Backend
 
 on:
   pull_request:
-    paths: ["backend/**", "frontend/**", "templates/**", "Dockerfile", ".dockerignore", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "frontend/**", "templates/**", "documents.json", "catalog.json", "Dockerfile", ".dockerignore", ".github/workflows/backend.yml"]
   push:
     branches: [main]
-    paths: ["backend/**", "frontend/**", "templates/**", "Dockerfile", ".dockerignore", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "frontend/**", "templates/**", "documents.json", "catalog.json", "Dockerfile", ".dockerignore", ".github/workflows/backend.yml"]
 
 concurrency:
   group: backend-${{ github.ref }}
@@ -37,6 +37,6 @@ jobs:
           curl -sf localhost:8000/api/health
           # Capture pages before grepping: grep -q exiting early would break curl's pipe under pipefail.
           login=$(curl -sf localhost:8000/)
-          nda=$(curl -sf localhost:8000/nda/)
+          create=$(curl -sf localhost:8000/create/)
           grep -q "<title>Sign in | Prelegal</title>" <<<"$login"
-          grep -q "<title>Mutual NDA Creator | Prelegal</title>" <<<"$nda"
+          grep -q "<title>Document Creator | Prelegal</title>" <<<"$create"

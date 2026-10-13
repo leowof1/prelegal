@@ -1,0 +1,158 @@
+[
+  {
+    "id": "mutual-nda",
+    "name": "Mutual Non-Disclosure Agreement",
+    "description": "Mutual NDA letting each party share confidential information for a stated purpose while protecting it from unauthorized use and disclosure.",
+    "file": "Mutual-NDA.md",
+    "roles": ["Party 1", "Party 2"],
+    "terms": [
+      { "key": "purpose", "label": "Purpose", "hint": "How Confidential Information may be used" },
+      { "key": "mndaTerm", "label": "MNDA Term", "hint": "e.g. Expires 1 year from Effective Date, or continues until terminated" },
+      { "key": "confidentialityTerm", "label": "Term of Confidentiality", "hint": "e.g. 1 year from Effective Date, or in perpetuity" },
+      { "key": "governingLaw", "label": "Governing Law", "hint": "A US state" },
+      { "key": "jurisdiction", "label": "Jurisdiction", "hint": "City or county and state of the courts" },
+      { "key": "modifications", "label": "MNDA Modifications", "hint": "Changes to the standard terms, or None" }
+    ]
+  },
+  {
+    "id": "cloud-service-agreement",
+    "name": "Cloud Service Agreement",
+    "description": "Standard terms for selling and buying cloud software (SaaS): access and use, fees, confidentiality, warranties, liability and termination.",
+    "file": "CSA.md",
+    "roles": ["Provider", "Customer"],
+    "terms": [
+      { "key": "subscriptionPeriod", "label": "Subscription Period", "hint": "e.g. 1 year from the Order Date" },
+      { "key": "technicalSupport", "label": "Technical Support", "hint": "Support the Provider gives during the Subscription Period" },
+      { "key": "generalCapAmount", "label": "General Cap Amount", "hint": "Liability cap, e.g. fees paid in the prior 12 months" },
+      { "key": "governingLaw", "label": "Governing Law", "hint": "A US state" },
+      { "key": "chosenCourts", "label": "Chosen Courts", "hint": "City or county and state of the courts" }
+    ]
+  },
+  {
+    "id": "service-level-agreement",
+    "name": "Service Level Agreement",
+    "description": "Supplement to a Cloud Service Agreement defining uptime targets, support response times and the service credits owed when they are missed.",
+    "file": "sla.md",
+    "roles": ["Provider", "Customer"],
+    "terms": [
+      { "key": "targetUptime", "label": "Target Uptime", "hint": "e.g. 99.9% per month" },
+      { "key": "targetResponseTime", "label": "Target Response Time", "hint": "e.g. 4 business hours" },
+      { "key": "supportChannel", "label": "Support Channel", "hint": "e.g. support@example.com" },
+      { "key": "uptimeCredit", "label": "Uptime Credit", "hint": "Credit owed when Target Uptime is missed" },
+      { "key": "responseTimeCredit", "label": "Response Time Credit", "hint": "Credit owed when Target Response Time is missed" },
+      { "key": "scheduledDowntime", "label": "Scheduled Downtime", "hint": "Planned maintenance windows" }
+    ]
+  },
+  {
+    "id": "data-processing-agreement",
+    "name": "Data Processing Agreement",
+    "description": "Agreement governing a provider's processing of customer personal data: processor and subprocessor roles, security, international transfers, GDPR/CCPA.",
+    "file": "DPA.md",
+    "roles": ["Provider", "Customer"],
+    "terms": [
+      { "key": "agreement", "label": "Agreement", "hint": "The underlying agreement this DPA supplements" },
+      { "key": "categoriesOfPersonalData", "label": "Categories of Personal Data", "hint": "e.g. names, email addresses" },
+      { "key": "categoriesOfDataSubjects", "label": "Categories of Data Subjects", "hint": "e.g. Customer's employees and end users" },
+      { "key": "natureAndPurposeOfProcessing", "label": "Nature and Purpose of Processing", "hint": "Why and how the data is processed" },
+      { "key": "approvedSubprocessors", "label": "Approved Subprocessors", "hint": "e.g. AWS (hosting)" },
+      { "key": "governingMemberState", "label": "Governing Member State", "hint": "EU member state whose law governs, e.g. Ireland" }
+    ]
+  },
+  {
+    "id": "design-partner-agreement",
+    "name": "Design Partner Agreement",
+    "description": "Agreement giving an early-stage partner access to a product in development in exchange for feedback and participation in a design partner program.",
+    "file": "design-partner-agreement.md",
+    "roles": ["Provider", "Partner"],
+    "terms": [
+      { "key": "program", "label": "Program", "hint": "What the design partner program involves" },
+      { "key": "term", "label": "Term", "hint": "e.g. 6 months from the Effective Date" },
+      { "key": "fees", "label": "Fees", "hint": "e.g. None" },
+      { "key": "governingLaw", "label": "Governing Law", "hint": "A US state" },
+      { "key": "chosenCourts", "label": "Chosen Courts", "hint": "City or county and state of the courts" }
+    ]
+  },
+  {
+    "id": "professional-services-agreement",
+    "name": "Professional Services Agreement",
+    "description": "Standard terms for engaging a provider to perform professional services and deliverables under statements of work (SOWs).",
+    "file": "psa.md",
+    "roles": ["Provider", "Customer"],
+    "terms": [
+      { "key": "deliverables", "label": "Deliverables", "hint": "What the Provider will deliver" },
+      { "key": "fees", "label": "Fees", "hint": "e.g. $10,000 per month" },
+      { "key": "paymentPeriod", "label": "Payment Period", "hint": "e.g. 30 days from invoice" },
+      { "key": "sowTerm", "label": "SOW Term", "hint": "How long the statement of work runs" },
+      { "key": "governingLaw", "label": "Governing Law", "hint": "A US state" },
+      { "key": "chosenCourts", "label": "Chosen Courts", "hint": "City or county and state of the courts" }
+    ]
+  },
+  {
+    "id": "partnership-agreement",
+    "name": "Partnership Agreement",
+    "description": "Agreement for business partnerships between companies: each party's obligations, payments, trademark use, confidentiality and liability.",
+    "file": "Partnership-Agreement.md",
+    "roles": ["Company", "Partner"],
+    "terms": [
+      { "key": "obligations", "label": "Obligations", "hint": "What each party will do under the partnership" },
+      { "key": "territory", "label": "Territory", "hint": "e.g. United States" },
+      { "key": "paymentSchedule", "label": "Payment Schedule", "hint": "Payments between the parties and when they are due" },
+      { "key": "endDate", "label": "End Date", "hint": "When the partnership ends" },
+      { "key": "governingLaw", "label": "Governing Law", "hint": "A US state" },
+      { "key": "chosenCourts", "label": "Chosen Courts", "hint": "City or county and state of the courts" }
+    ]
+  },
+  {
+    "id": "business-associate-agreement",
+    "name": "Business Associate Agreement",
+    "description": "HIPAA Business Associate Agreement governing how a provider may use, disclose and safeguard protected health information (PHI) for a covered entity.",
+    "file": "BAA.md",
+    "roles": ["Provider", "Company"],
+    "terms": [
+      { "key": "agreement", "label": "Agreement", "hint": "The underlying agreement this BAA supplements" },
+      { "key": "breachNotificationPeriod", "label": "Breach Notification Period", "hint": "e.g. 10 days after discovery" },
+      { "key": "limitations", "label": "Limitations", "hint": "Limits on how the Provider may use PHI, or None" }
+    ]
+  },
+  {
+    "id": "software-license-agreement",
+    "name": "Software License Agreement",
+    "description": "Standard terms for licensing software that the customer installs and runs on its own systems: license scope, restrictions, fees, support and warranties.",
+    "file": "Software-License-Agreement.md",
+    "roles": ["Provider", "Customer"],
+    "terms": [
+      { "key": "subscriptionPeriod", "label": "Subscription Period", "hint": "e.g. 1 year from the Order Date" },
+      { "key": "permittedUses", "label": "Permitted Uses", "hint": "What the Customer may use the software for" },
+      { "key": "licenseLimits", "label": "License Limits", "hint": "e.g. up to 50 users" },
+      { "key": "warrantyPeriod", "label": "Warranty Period", "hint": "e.g. 90 days" },
+      { "key": "governingLaw", "label": "Governing Law", "hint": "A US state" },
+      { "key": "chosenCourts", "label": "Chosen Courts", "hint": "City or county and state of the courts" }
+    ]
+  },
+  {
+    "id": "pilot-agreement",
+    "name": "Pilot Agreement",
+    "description": "Agreement for a limited-time trial or pilot of a product so a customer can evaluate it before committing to a full purchase.",
+    "file": "Pilot-Agreement.md",
+    "roles": ["Provider", "Customer"],
+    "terms": [
+      { "key": "pilotPeriod", "label": "Pilot Period", "hint": "e.g. 90 days from the Effective Date" },
+      { "key": "generalCapAmount", "label": "General Cap Amount", "hint": "Liability cap, e.g. $10,000" },
+      { "key": "governingLaw", "label": "Governing Law", "hint": "A US state" },
+      { "key": "chosenCourts", "label": "Chosen Courts", "hint": "City or county and state of the courts" }
+    ]
+  },
+  {
+    "id": "ai-addendum",
+    "name": "AI Addendum",
+    "description": "Addendum to a commercial agreement governing AI services: rights in inputs and outputs, limits on model training and responsibility for AI output.",
+    "file": "AI-Addendum.md",
+    "roles": ["Provider", "Customer"],
+    "terms": [
+      { "key": "trainingData", "label": "Training Data", "hint": "Customer data the Provider may train on, or None" },
+      { "key": "trainingPurposes", "label": "Training Purposes", "hint": "What training is allowed for, or None" },
+      { "key": "trainingRestrictions", "label": "Training Restrictions", "hint": "Limits on training, or None" },
+      { "key": "improvementRestrictions", "label": "Improvement Restrictions", "hint": "Limits on using data to improve the product, or None" }
+    ]
+  }
+]

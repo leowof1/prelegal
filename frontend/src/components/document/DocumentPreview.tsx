@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { Block, Inline } from "@/lib/nda/types";
+import type { Block, Inline } from "@/lib/document/types";
 
 function InlineText({ content }: { content: Inline[] }) {
   return content.map((run, i) => {
@@ -33,12 +33,7 @@ function BlockView({ block }: { block: Block }) {
           {block.hint && <p className="text-xs italic text-stone-500">{block.hint}</p>}
           {block.lines.map((line, i) => (
             <p key={i}>
-              {line.label && <span className="font-semibold">{line.label}: </span>}
-              <span
-                className={
-                  line.placeholder ? "rounded bg-amber-100 px-1 text-amber-800" : "whitespace-pre-line"
-                }
-              >
+              <span className={line.placeholder ? "rounded bg-amber-100 px-1 text-amber-800" : "whitespace-pre-line"}>
                 {line.value}
               </span>
             </p>
@@ -81,8 +76,8 @@ function BlockView({ block }: { block: Block }) {
       );
     case "clause":
       return (
-        <p>
-          {block.number}. <InlineText content={block.content} />
+        <p style={{ marginLeft: `${block.level * 1.5}rem` }}>
+          {block.label} <InlineText content={block.content} />
         </p>
       );
     case "attribution":
@@ -96,7 +91,7 @@ function BlockView({ block }: { block: Block }) {
   }
 }
 
-export function NdaPreview({ blocks }: { blocks: Block[] }) {
+export function DocumentPreview({ blocks }: { blocks: Block[] }) {
   return (
     <article className="space-y-4 font-serif text-[15px] leading-relaxed text-stone-900">
       {blocks.map((block, i) => (

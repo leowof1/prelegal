@@ -6,11 +6,11 @@ from prelegal_backend.main import create_app
 
 @pytest.fixture
 def static_dir(tmp_path):
-    """A minimal statically exported frontend: a login page and an NDA page."""
+    """A minimal statically exported frontend: a login page and a document creator page."""
     site = tmp_path / "out"
-    (site / "nda").mkdir(parents=True)
+    (site / "create").mkdir(parents=True)
     (site / "index.html").write_text("<h1>Login</h1>")
-    (site / "nda" / "index.html").write_text("<h1>NDA</h1>")
+    (site / "create" / "index.html").write_text("<h1>Create</h1>")
     (site / "404.html").write_text("<h1>Not found</h1>")
     return site
 
