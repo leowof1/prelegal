@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { Block, Inline } from "@/lib/nda/types";
+import type { Block, Inline } from "@/lib/document/types";
 
 function InlineText({ content }: { content: Inline[] }) {
   return content.map((run, i) => {
@@ -96,7 +96,7 @@ function BlockView({ block }: { block: Block }) {
   }
 }
 
-export function NdaPreview({ blocks }: { blocks: Block[] }) {
+export function DocumentPreview({ blocks }: { blocks: Block[] }) {
   return (
     <article className="space-y-4 font-serif text-[15px] leading-relaxed text-stone-900">
       {blocks.map((block, i) => (

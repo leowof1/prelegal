@@ -1,11 +1,11 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { loadNdaTemplate } from "@/lib/nda/template";
-import { NdaCreator } from "./NdaCreator";
+import { loadNdaTemplate } from "@/lib/document/template";
+import { DocumentCreator } from "./DocumentCreator";
 
 // Runs in Node, like Next.js prerendering at build time.
-describe("NdaCreator server rendering", () => {
-  const html = renderToString(<NdaCreator template={loadNdaTemplate()} />);
+describe("DocumentCreator server rendering", () => {
+  const html = renderToString(<DocumentCreator template={loadNdaTemplate()} />);
 
   it("does not bake the build date into the static HTML", () => {
     // The client fills in "today" after hydration; the server must render the placeholder.

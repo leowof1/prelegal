@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { buildNdaDocument, defaultNdaValues, pdfFilename, todayIso } from "@/lib/nda/build";
-import { unsupportedPdfCharacters } from "@/lib/nda/pdf-charset";
-import type { NdaTemplate, NdaValues } from "@/lib/nda/types";
-import { NdaChat } from "./NdaChat";
-import { NdaPreview } from "./NdaPreview";
+import { buildNdaDocument, defaultNdaValues, pdfFilename, todayIso } from "@/lib/document/build";
+import { unsupportedPdfCharacters } from "@/lib/document/pdf-charset";
+import type { NdaTemplate, NdaValues } from "@/lib/document/types";
+import { DocumentChat } from "./DocumentChat";
+import { DocumentPreview } from "./DocumentPreview";
 import { submitButtonClass } from "@/components/ui/styles";
 
 const noopSubscribe = () => () => {};
@@ -18,7 +18,7 @@ function useToday(): string {
   return useSyncExternalStore(noopSubscribe, todayIso, () => "");
 }
 
-export function NdaCreator({ template }: { template: NdaTemplate }) {
+export function DocumentCreator({ template }: { template: NdaTemplate }) {
   const today = useToday();
   const [edited, setEdited] = useState<NdaValues | null>(null);
   const values = edited ?? defaultNdaValues(today);
@@ -33,8 +33,8 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
     setError(null);
     try {
       // Loaded on demand: the PDF renderer is large and only needed here.
-      const { renderNdaPdf } = await import("./nda-pdf");
-      const url = URL.createObjectURL(await renderNdaPdf(blocks));
+      const { renderDocumentPdf } = await import("./document-pdf");
+      const url = URL.createObjectURL(await renderDocumentPdf(blocks));
       const link = document.createElement("a");
       link.href = url;
       link.download = pdfFilename(values);
@@ -52,7 +52,7 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
       <section aria-label="NDA chat">
-        <NdaChat values={values} onChange={setEdited} />
+        <DocumentChat values={values} onChange={setEdited} />
       </section>
 
       <section className="space-y-4 lg:sticky lg:top-6 lg:self-start">
@@ -87,7 +87,7 @@ export function NdaCreator({ template }: { template: NdaTemplate }) {
           tabIndex={0}
           className="max-h-[calc(100vh-8rem)] overflow-y-auto rounded-lg border border-stone-200 bg-white p-8 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue sm:p-12"
         >
-          <NdaPreview blocks={blocks} />
+          <DocumentPreview blocks={blocks} />
         </div>
       </section>
     </div>

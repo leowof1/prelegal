@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { UserMenu } from "@/components/layout/UserMenu";
-import { NdaCreator } from "@/components/nda/NdaCreator";
-import { loadNdaTemplate } from "@/lib/nda/template";
+import { DocumentCreator } from "@/components/document/DocumentCreator";
+import { loadNdaTemplate } from "@/lib/document/template";
 
 export const metadata: Metadata = {
   title: "Mutual NDA Creator | Prelegal",
@@ -26,7 +26,7 @@ export default function NdaPage() {
             fill in as you go. When you&apos;re done, download it as a PDF ready to sign.
           </p>
         </div>
-        <NdaCreator template={template} />
+        <DocumentCreator template={template} />
       </main>
     </>
   );

@@ -2,15 +2,15 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WireValues } from "@/lib/nda/chat";
-import { loadNdaTemplate } from "@/lib/nda/template";
-import type { Block } from "@/lib/nda/types";
+import type { WireValues } from "@/lib/document/chat";
+import { loadNdaTemplate } from "@/lib/document/template";
+import type { Block } from "@/lib/document/types";
 import { filledValues } from "@/test/fixtures";
-import { GREETING } from "./NdaChat";
-import { NdaCreator } from "./NdaCreator";
+import { GREETING } from "./DocumentChat";
+import { DocumentCreator } from "./DocumentCreator";
 
-const renderNdaPdf = vi.fn<(blocks: Block[]) => Promise<Blob>>();
-vi.mock("./nda-pdf", () => ({ renderNdaPdf: (blocks: Block[]) => renderNdaPdf(blocks) }));
+const renderDocumentPdf = vi.fn<(blocks: Block[]) => Promise<Blob>>();
+vi.mock("./document-pdf", () => ({ renderDocumentPdf: (blocks: Block[]) => renderDocumentPdf(blocks) }));
 
 const template = loadNdaTemplate();
 
@@ -32,7 +32,7 @@ function stubChat(reply: string, update: (values: WireValues) => WireValues = (v
 
 function setup() {
   const user = userEvent.setup();
-  render(<NdaCreator template={template} />);
+  render(<DocumentCreator template={template} />);
   const preview = within(screen.getByRole("region", { name: "Agreement preview" }));
   const log = within(screen.getByRole("log", { name: "Conversation" }));
   async function say(text: string) {
@@ -50,10 +50,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  renderNdaPdf.mockReset();
+  renderDocumentPdf.mockReset();
 });
 
-describe("NdaCreator defaults", () => {
+describe("DocumentCreator defaults", () => {
   it("prefills the template defaults and today's date", () => {
     const { preview } = setup();
 
@@ -74,7 +74,7 @@ describe("NdaCreator defaults", () => {
   });
 });
 
-describe("NdaCreator chat", () => {
+describe("DocumentCreator chat", () => {
   it("greets the user without calling the AI", () => {
     const { fetchMock } = stubChat("unused");
     const { log } = setup();
@@ -184,7 +184,7 @@ describe("NdaCreator chat", () => {
   });
 });
 
-describe("NdaCreator AI output safety", () => {
+describe("DocumentCreator AI output safety", () => {
   it("renders markup from the AI literally in the preview and the chat", async () => {
     const markup = "**bold** [x](https://evil.test) <b>tag</b>";
     stubChat(`<i>${markup}</i>`, (v) => ({ ...v, purpose: markup }));
@@ -212,7 +212,7 @@ describe("NdaCreator AI output safety", () => {
   });
 });
 
-describe("NdaCreator PDF download", () => {
+describe("DocumentCreator PDF download", () => {
   let click: ReturnType<typeof vi.spyOn>;
   let downloads: { href: string; download: string }[];
 
@@ -233,7 +233,7 @@ describe("NdaCreator PDF download", () => {
 
   it("renders the chat-filled document and downloads it with a party-based filename", async () => {
     let resolve!: (blob: Blob) => void;
-    renderNdaPdf.mockReturnValue(new Promise((r) => (resolve = r)));
+    renderDocumentPdf.mockReturnValue(new Promise((r) => (resolve = r)));
     stubChat("Noted.", (v) => ({ ...v, parties: [{ ...v.parties[0], company: "Acme Inc" }, v.parties[1]] }));
     const { user, log, say } = setup();
     await say("Acme Inc");
@@ -243,7 +243,7 @@ describe("NdaCreator PDF download", () => {
 
     const busy = screen.getByRole("button", { name: "Preparing PDF…" });
     expect(busy).toBeDisabled();
-    expect(JSON.stringify(renderNdaPdf.mock.calls[0][0])).toContain("Acme Inc");
+    expect(JSON.stringify(renderDocumentPdf.mock.calls[0][0])).toContain("Acme Inc");
 
     resolve(new Blob(["%PDF-"], { type: "application/pdf" }));
 
@@ -255,7 +255,7 @@ describe("NdaCreator PDF download", () => {
   it("shows an error and recovers when PDF generation fails", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const failure = new Error("boom");
-    renderNdaPdf.mockRejectedValueOnce(failure);
+    renderDocumentPdf.mockRejectedValueOnce(failure);
     const { user } = setup();
 
     await user.click(screen.getByRole("button", { name: "Download PDF" }));
@@ -263,14 +263,14 @@ describe("NdaCreator PDF download", () => {
     expect(downloads).toEqual([]);
     expect(consoleError).toHaveBeenCalledWith(failure);
 
-    renderNdaPdf.mockResolvedValueOnce(new Blob(["%PDF-"]));
+    renderDocumentPdf.mockResolvedValueOnce(new Blob(["%PDF-"]));
     await user.click(screen.getByRole("button", { name: "Download PDF" }));
     await waitFor(() => expect(downloads).toHaveLength(1));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
 
-describe("NdaCreator accessibility semantics", () => {
+describe("DocumentCreator accessibility semantics", () => {
   it("names the message box and labels who said what", async () => {
     stubChat("Noted.");
     const { log, say } = setup();

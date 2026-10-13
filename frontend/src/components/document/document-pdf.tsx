@@ -1,5 +1,5 @@
 import { Document, Link, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
-import type { Block, Inline } from "@/lib/nda/types";
+import type { Block, Inline } from "@/lib/document/types";
 
 // Built-in PDF fonts, so no font files need to be fetched.
 const styles = StyleSheet.create({
@@ -137,7 +137,7 @@ function splitPages(blocks: Block[]): Block[][] {
 }
 
 /** Renders the document model to a PDF file. Client-side; import lazily. */
-export function renderNdaPdf(blocks: Block[]): Promise<Blob> {
+export function renderDocumentPdf(blocks: Block[]): Promise<Blob> {
   return pdf(
     <Document title="Mutual Non-Disclosure Agreement" creator="Prelegal">
       {splitPages(blocks).map((pageBlocks, pageIndex) => (

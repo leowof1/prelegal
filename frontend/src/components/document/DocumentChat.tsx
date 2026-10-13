@@ -1,15 +1,15 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { type ChatMessage, sendChat } from "@/lib/nda/chat";
-import type { NdaValues } from "@/lib/nda/types";
+import { type ChatMessage, sendChat } from "@/lib/document/chat";
+import type { NdaValues } from "@/lib/document/types";
 import { inputClass, submitButtonClass } from "@/components/ui/styles";
 
 export const GREETING =
   "Hi! I'll help you draft a Mutual Non-Disclosure Agreement. To start, who are the two parties, and why will they be sharing confidential information?";
 
 /** Freeform AI chat that fills in the NDA values as the conversation goes. */
-export function NdaChat({ values, onChange }: { values: NdaValues; onChange: (values: NdaValues) => void }) {
+export function DocumentChat({ values, onChange }: { values: NdaValues; onChange: (values: NdaValues) => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: GREETING }]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { GREETING } from "../src/components/nda/NdaChat";
-import type { WireValues } from "../src/lib/nda/chat";
+import { GREETING } from "../src/components/document/DocumentChat";
+import type { WireValues } from "../src/lib/document/chat";
 import { extractPdfPages } from "../src/test/pdf-text";
 import { failOnPageErrors, scanA11y } from "./helpers";
 

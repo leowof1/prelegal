@@ -1,16 +1,16 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { buildNdaDocument, defaultNdaValues } from "@/lib/nda/build";
-import { loadNdaTemplate } from "@/lib/nda/template";
-import type { NdaValues } from "@/lib/nda/types";
+import { buildNdaDocument, defaultNdaValues } from "@/lib/document/build";
+import { loadNdaTemplate } from "@/lib/document/template";
+import type { NdaValues } from "@/lib/document/types";
 import { filledValues } from "@/test/fixtures";
 import { extractPdfItems, extractPdfPages } from "@/test/pdf-text";
-import { renderNdaPdf } from "./nda-pdf";
+import { renderDocumentPdf } from "./document-pdf";
 
 const template = loadNdaTemplate();
 const PDF_TIMEOUT = 30_000;
 
 async function renderBytes(values: NdaValues) {
-  const blob = await renderNdaPdf(buildNdaDocument(template, values));
+  const blob = await renderDocumentPdf(buildNdaDocument(template, values));
   return { blob, bytes: new Uint8Array(await blob.arrayBuffer()) };
 }
 
@@ -26,7 +26,7 @@ const withParty1 = (patch: Partial<NdaValues["parties"][0]>): NdaValues => {
 
 const SIGNATURE_ROWS = ["Signature", "Print Name", "Title", "Company", "Notice Address", "Date"];
 
-describe("renderNdaPdf", () => {
+describe("renderDocumentPdf", () => {
   let pages: string[];
   let blob: Blob;
   let bytes: Uint8Array;

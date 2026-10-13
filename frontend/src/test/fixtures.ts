@@ -1,5 +1,5 @@
-import { defaultNdaValues } from "@/lib/nda/build";
-import type { NdaValues } from "@/lib/nda/types";
+import { defaultNdaValues } from "@/lib/document/build";
+import type { NdaValues } from "@/lib/document/types";
 
 /** A fully filled-in NDA used across tests. */
 export const filledValues = (): NdaValues => ({

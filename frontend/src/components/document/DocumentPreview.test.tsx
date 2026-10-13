@@ -1,17 +1,17 @@
 /** @vitest-environment jsdom */
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { buildNdaDocument, defaultNdaValues } from "@/lib/nda/build";
-import { loadNdaTemplate } from "@/lib/nda/template";
+import { buildNdaDocument, defaultNdaValues } from "@/lib/document/build";
+import { loadNdaTemplate } from "@/lib/document/template";
 import { filledValues } from "@/test/fixtures";
-import { NdaPreview } from "./NdaPreview";
+import { DocumentPreview } from "./DocumentPreview";
 
 const template = loadNdaTemplate();
 
 const renderPreview = (values = filledValues()) =>
-  render(<NdaPreview blocks={buildNdaDocument(template, values)} />);
+  render(<DocumentPreview blocks={buildNdaDocument(template, values)} />);
 
-describe("NdaPreview", () => {
+describe("DocumentPreview", () => {
   it("renders the cover page fields with their hints", () => {
     renderPreview();
 
