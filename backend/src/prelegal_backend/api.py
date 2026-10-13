@@ -18,5 +18,5 @@ def health(request: Request) -> dict[str, str]:
 
 @router.post("/chat")
 def post_chat(request: ChatRequest) -> ChatReply:
-    """Return the assistant's reply and the updated NDA fields."""
+    """Return the assistant's reply and the updated document values."""
     return chat(request)

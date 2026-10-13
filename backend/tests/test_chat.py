@@ -9,20 +9,19 @@ from prelegal_backend.main import create_app
 
 EMPTY_PARTY = {"name": "", "title": "", "company": "", "noticeAddress": ""}
 VALUES = {
-    "purpose": "Evaluating a partnership.",
+    "documentId": "pilot-agreement",
     "effectiveDate": "2026-10-09",
-    "mndaTerm": {"kind": "expires", "years": 1},
-    "confidentialityTerm": {"kind": "years", "years": None},
-    "governingLaw": "",
-    "jurisdiction": "",
-    "modifications": "",
+    "terms": [{"key": "pilotPeriod", "value": "90 days"}, {"key": "governingLaw", "value": ""}],
     "parties": [EMPTY_PARTY, EMPTY_PARTY],
 }
 MESSAGES = [
     {"role": "assistant", "content": "Hi! Who are the parties?"},
     {"role": "user", "content": "Acme and Globex, Delaware law."},
 ]
-REPLY = {"reply": "Noted. Who signs for Acme?", "values": {**VALUES, "governingLaw": "Delaware"}}
+REPLY = {
+    "reply": "Noted. Who signs for Acme?",
+    "values": {**VALUES, "terms": [{"key": "pilotPeriod", "value": "90 days"}, {"key": "governingLaw", "value": "Delaware"}]},
+}
 
 
 @pytest.fixture
@@ -50,15 +49,29 @@ def test_chat_calls_llm_with_structured_output(client, llm_calls):
     assert call["model"] == "openrouter/openai/gpt-oss-120b"
     assert call["response_format"] is chat.ChatReply
     assert call["reasoning_effort"] == "low"
+    assert call["allowed_openai_params"] == ["reasoning_effort"]
     assert call["extra_body"] == {"provider": {"order": ["cerebras"]}}
 
 
-def test_chat_sends_current_values_then_history(client, llm_calls):
+def test_chat_sends_catalog_and_current_values_then_history(client, llm_calls):
     client.post("/api/chat", json={"messages": MESSAGES, "values": VALUES})
     system, *history = llm_calls[0]["messages"]
     assert system["role"] == "system"
-    assert '"purpose":"Evaluating a partnership."' in system["content"]
+    assert "cloud-service-agreement: Cloud Service Agreement." in system["content"]
+    assert '"documentId":"pilot-agreement"' in system["content"]
+    assert '{"key":"pilotPeriod","value":"90 days"}' in system["content"]
     assert history == MESSAGES
+
+
+def test_chat_accepts_no_document_chosen(client, llm_calls):
+    body = {"messages": MESSAGES, "values": {**VALUES, "documentId": None, "terms": []}}
+    assert client.post("/api/chat", json=body).status_code == 200
+
+
+def test_chat_rejects_unknown_document(client, llm_calls):
+    body = {"messages": MESSAGES, "values": {**VALUES, "documentId": "employment-contract"}}
+    assert client.post("/api/chat", json=body).status_code == 422
+    assert llm_calls == []
 
 
 def test_chat_rejects_wrong_number_of_parties(client, llm_calls):
@@ -92,3 +105,10 @@ def test_schema_tells_the_model_signer_name_from_company():
     party = chat.ChatReply.model_json_schema()["$defs"]["Party"]["properties"]
     assert "signing" in party["name"]["description"]
     assert "company" in party["company"]["description"]
+
+
+def test_schema_limits_document_id_to_supported_documents():
+    schema = chat.ChatReply.model_json_schema()["$defs"]["DocumentValues"]["properties"]["documentId"]
+    [ids, null] = schema["anyOf"]
+    assert "pilot-agreement" in ids["enum"] and len(ids["enum"]) == 11
+    assert null == {"type": "null"}
