@@ -3,13 +3,17 @@ import { expect, test, type Page } from "@playwright/test";
 import { GREETING } from "../src/components/document/DocumentChat";
 import type { WireValues } from "../src/lib/document/chat";
 import { extractPdfPages } from "../src/test/pdf-text";
-import { failOnPageErrors, scanA11y } from "./helpers";
+import { failOnPageErrors, scanA11y, signUp } from "./helpers";
 
 const preview = (page: Page) => page.getByRole("region", { name: "Agreement preview" });
 const documentList = (page: Page) => page.getByRole("region", { name: "Available documents" });
 const conversation = (page: Page) => page.getByRole("log", { name: "Conversation" });
 
 failOnPageErrors();
+
+test.beforeEach(async ({ page }) => {
+  await signUp(page);
+});
 
 const PARTIES: WireValues["parties"] = [
   { name: "Ada Lovelace", title: "CEO", company: "Acme Inc", noticeAddress: "ada@acme.test" },
@@ -125,6 +129,7 @@ test("fills the agreement from the chat and downloads a matching PDF", async ({ 
   await expect(doc.getByRole("row", { name: /Company/ })).toContainText("Acme Inc");
   await expect(doc.getByRole("row", { name: /Company/ })).toContainText("Globex LLC");
   await expect(doc.locator(".bg-amber-100")).toHaveCount(0);
+  await expect(page.getByRole("note", { name: "Draft disclaimer" })).toContainText("subject to legal review");
 
   const { filename, pages } = await downloadPdf(page);
 
@@ -210,8 +215,7 @@ test("is operable with the keyboard alone", async ({ page }) => {
   await page.goto("/create/");
 
   // After the header's last control, Tab reaches the conversation and then the message box.
-  // (The header link is not asserted: WebKit, like Safari, skips links when tabbing.)
-  await page.getByRole("link", { name: "Sign in" }).focus();
+  await page.getByRole("button", { name: "Sign out" }).focus();
   await page.keyboard.press("Tab");
   await expect(conversation(page)).toBeFocused();
   await page.keyboard.press("Tab");

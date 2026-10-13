@@ -1,9 +1,11 @@
 /** @vitest-environment jsdom */
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WireValues } from "@/lib/document/chat";
 import type { Block } from "@/lib/document/types";
+import { defaultDocumentValues } from "@/lib/document/build";
 import { documentTypes } from "@/test/fixtures";
 import { GREETING } from "./DocumentChat";
 import { DocumentCreator } from "./DocumentCreator";
@@ -18,15 +20,24 @@ interface ChatBody {
   values: WireValues;
 }
 
-/** Stubs /api/chat: each call replies with `reply` and the sent values updated by `update`. */
+/**
+ * Stubs the API: each /api/chat call replies with `reply` and the sent values updated by `update`;
+ * saving a new document returns id 1.
+ */
 function stubChat(reply: string, update: (values: WireValues) => WireValues = (v) => v) {
-  const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+  const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+    if (url.startsWith("/api/documents")) {
+      return init.method === "POST" ? Response.json({ id: 1 }, { status: 201 }) : new Response(null, { status: 204 });
+    }
     const body: ChatBody = JSON.parse(init.body as string);
     return Response.json({ reply, values: update(body.values) });
   });
   vi.stubGlobal("fetch", fetchMock);
-  const bodies = () => fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string) as ChatBody);
-  return { fetchMock, bodies };
+  const calls = (prefix: string) => fetchMock.mock.calls.filter(([url]) => url.startsWith(prefix));
+  const bodies = () => calls("/api/chat").map(([, init]) => JSON.parse(init.body as string) as ChatBody);
+  const saves = () =>
+    calls("/api/documents").map(([url, init]) => ({ url, method: init.method, body: JSON.parse(init.body as string) as ChatBody }));
+  return { fetchMock, bodies, saves };
 }
 
 const EMPTY_PARTY = { name: "", title: "", company: "", noticeAddress: "" };
@@ -36,9 +47,9 @@ const nda =
   (terms: WireValues["terms"] = [], patch: Partial<WireValues> = {}) =>
   (v: WireValues): WireValues => ({ ...v, documentId: "mutual-nda", terms, ...patch });
 
-function setup() {
+function setup(props: Omit<ComponentProps<typeof DocumentCreator>, "documentTypes"> = {}) {
   const user = userEvent.setup();
-  render(<DocumentCreator documentTypes={documentTypes} />);
+  render(<DocumentCreator documentTypes={documentTypes} {...props} />);
   const preview = () => within(screen.getByRole("region", { name: "Agreement preview" }));
   const log = within(screen.getByRole("log", { name: "Conversation" }));
   async function say(text: string) {
@@ -331,5 +342,87 @@ describe("DocumentCreator accessibility semantics", () => {
 
     await exchange("An NDA", "Noted.");
     expect(screen.getByRole("region", { name: "Agreement preview" })).toHaveAttribute("tabindex", "0");
+  });
+});
+
+describe("DocumentCreator saving", () => {
+  it("does not save until a document is chosen", async () => {
+    const { saves } = stubChat("Which document do you need?");
+    const { exchange } = setup();
+    await exchange("Hello", "Which document do you need?");
+    expect(saves()).toEqual([]);
+  });
+
+  it("saves a new document after the reply that chooses it, then updates it on later turns", async () => {
+    const onSaved = vi.fn();
+    const { saves } = stubChat("Let's draft an NDA.", nda([{ key: "governingLaw", value: "Delaware" }]));
+    const { exchange } = setup({ onSaved });
+
+    await exchange("An NDA under Delaware law", "Let's draft an NDA.");
+    expect(await screen.findByText("Saved to My documents")).toBeInTheDocument();
+    const [created] = saves();
+    expect([created.url, created.method]).toEqual(["/api/documents", "POST"]);
+    expect(created.body.values.documentId).toBe("mutual-nda");
+    expect(created.body.messages.map((m) => m.content)).toEqual([GREETING, "An NDA under Delaware law", "Let's draft an NDA."]);
+    expect(onSaved).toHaveBeenCalledWith(1, expect.objectContaining({ messages: created.body.messages }));
+
+    const later = stubChat("Noted.");
+    await exchange("Courts in Wilmington", "Noted.");
+    await waitFor(() => expect(later.saves()).toHaveLength(1));
+    expect([later.saves()[0].url, later.saves()[0].method]).toEqual(["/api/documents/1", "PUT"]);
+    expect(later.saves()[0].body.messages).toHaveLength(5);
+  });
+
+  it("tells the user when saving fails and keeps the conversation going", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    stubChat("Let's draft an NDA.", nda());
+    vi.mocked(fetch).mockImplementationOnce(async (url, init) => {
+      const body: ChatBody = JSON.parse((init as RequestInit).body as string);
+      return Response.json({ reply: "Let's draft an NDA.", values: nda()(body.values) });
+    });
+    vi.mocked(fetch).mockImplementationOnce(async () => new Response("", { status: 500 }));
+    const { log, exchange } = setup();
+
+    await exchange("An NDA", "Let's draft an NDA.");
+
+    expect(await screen.findByText("Could not save your latest changes")).toBeInTheDocument();
+    expect(log.getByText("An NDA")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("reopens a saved document with its conversation and keeps saving to it", async () => {
+    const values = { ...defaultDocumentValues("2026-10-01"), documentId: "mutual-nda", terms: { governingLaw: "Delaware" } };
+    const messages = [
+      { role: "assistant" as const, content: GREETING },
+      { role: "user" as const, content: "An NDA under Delaware law" },
+      { role: "assistant" as const, content: "Who are the parties?" },
+    ];
+    const { saves } = stubChat("Noted.");
+    const { preview, log, exchange } = setup({ initialId: 7, initial: { values, messages } });
+
+    expect(log.getByText("Who are the parties?")).toBeInTheDocument();
+    expect(preview().getByText("Delaware")).toBeInTheDocument();
+    expect(preview().getByText("October 1, 2026")).toBeInTheDocument();
+    expect(screen.getByText("Saved to My documents")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
+
+    await exchange("Acme and Globex", "Noted.");
+    await waitFor(() => expect(saves()).toHaveLength(1));
+    expect([saves()[0].url, saves()[0].method]).toEqual(["/api/documents/7", "PUT"]);
+    expect(saves()[0].body.messages).toHaveLength(5);
+  });
+});
+
+describe("DocumentCreator disclaimer", () => {
+  it("marks the previewed document as a draft subject to legal review", async () => {
+    stubChat("Let's draft an NDA.", nda());
+    const { exchange } = setup();
+    expect(screen.queryByRole("note", { name: "Draft disclaimer" })).not.toBeInTheDocument();
+
+    await exchange("An NDA", "Let's draft an NDA.");
+
+    expect(screen.getByRole("note", { name: "Draft disclaimer" })).toHaveTextContent(
+      "Draft only, subject to legal review.",
+    );
   });
 });

@@ -1,8 +1,9 @@
 # Prelegal frontend
 
-Next.js app for drafting legal agreements. `/` is a placeholder sign-in screen (any name and email, no real
-authentication yet). `/create/` is the **Document Creator**: an AI chat works out which of the supported Common
-Paper agreements the user needs, fills in its key terms, shows the document update live, and offers it as a PDF.
+Next.js app for drafting legal agreements. `/` is the sign-in and sign-up screen. `/create/` is the **Document
+Creator**: an AI chat works out which of the supported Common Paper agreements the user needs, fills in its key terms,
+shows the document update live, and offers it as a PDF. `/documents/` lists the user's saved documents; each
+reopens at `/create/?doc=ID` with its conversation.
 
 ## Getting started
 
@@ -21,7 +22,11 @@ npm run dev      # http://localhost:3000
 ## How it works
 
 - The app is a static export (`output: "export"`), served in production by the FastAPI backend in `../backend`.
-  The signed-in user is kept in `localStorage` (`src/lib/session/user.ts`).
+  The backend sets an httpOnly session cookie; `useUser()` (`src/lib/session/user.ts`) asks `/api/auth/me` who is
+  signed in, and `RequireUser` sends signed-out visitors to `/`. The dev server has no `/api`, so test sign-in and
+  saving against the backend (`npm run build`, then run it from `../backend`).
+- Once the chat has chosen a document, `DocumentCreator` saves it (values and conversation) to `/api/documents` after
+  every reply; `DocumentWorkspace` opens `?doc=ID` and switches a new document's URL to it on the first save.
 
 - `src/lib/document/template.ts` reads `../documents.json` and each document's template in `../templates/` at build
   time (the page is statically rendered), so the repo stays the single source of truth. The app must be built from

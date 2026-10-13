@@ -47,6 +47,6 @@ describe("sendChat", () => {
       "fetch",
       vi.fn(async () => new Response("", { status: 500 })),
     );
-    await expect(sendChat([], filledValues())).rejects.toThrow("Chat request failed: 500");
+    await expect(sendChat([], filledValues())).rejects.toThrow("POST /api/chat failed: 500");
   });
 });
