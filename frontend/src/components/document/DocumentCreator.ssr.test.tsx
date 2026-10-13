@@ -1,23 +1,20 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { loadNdaTemplate } from "@/lib/document/template";
+import { documentTypes } from "@/test/fixtures";
 import { DocumentCreator } from "./DocumentCreator";
 
 // Runs in Node, like Next.js prerendering at build time.
 describe("DocumentCreator server rendering", () => {
-  const html = renderToString(<DocumentCreator template={loadNdaTemplate()} />);
+  const html = renderToString(<DocumentCreator documentTypes={documentTypes} />);
 
-  it("does not bake the build date into the static HTML", () => {
-    // The client fills in "today" after hydration; the server must render the placeholder.
-    expect(html).toContain("[Effective Date]");
-    expect(html).not.toMatch(/(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}/);
+  it("prerenders the chat and the list of documents the assistant can draft", () => {
+    expect(html).toContain("I&#x27;ll help you draft a legal agreement");
+    expect(html).toContain("Tell the assistant what you need");
+    for (const { spec } of documentTypes) expect(html).toContain(spec.name);
   });
 
-  it("prerenders the chat, the preview and the full Standard Terms", () => {
-    expect(html).toContain("I&#x27;ll help you draft a Mutual Non-Disclosure Agreement");
-    expect(html).toContain("Download PDF");
-    expect(html).toContain("Agreement preview");
-    expect(html).toContain("Equitable Relief");
-    expect(html).toContain("which together form the same agreement.");
+  it("shows no preview or download until a document is chosen", () => {
+    expect(html).not.toContain("Agreement preview");
+    expect(html).not.toContain("Download PDF");
   });
 });

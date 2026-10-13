@@ -21,5 +21,6 @@ The app runs at http://localhost:8000. The SQLite database is recreated on every
 - `frontend/` - Next.js app, statically exported (`npm run build` writes `frontend/out/`)
 - `backend/` - FastAPI (uv project) serving `/api` and the exported frontend
 - `templates/` - Common Paper agreement templates
+- `documents.json` - the supported documents: party roles and the key terms the AI chat asks for
 
 Backend locally: `cd backend && uv run uvicorn prelegal_backend.main:app_from_env --factory --reload` (after building the frontend). Tests: `uv run pytest`.

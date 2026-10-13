@@ -1,68 +1,58 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parseInline } from "./markdown";
-import type { NdaTemplate } from "./types";
+import type { Clause, DocumentSpec, DocumentType, ParsedTemplate } from "./types";
 
-/** The repository-level templates directory (the frontend lives in `<repo>/frontend`). */
-const TEMPLATES_DIR = path.join(process.cwd(), "..", "templates");
+/** The repository root (the frontend lives in `<repo>/frontend`). */
+const REPO_ROOT = path.join(process.cwd(), "..");
 
-const COVER_PAGE_FILE = "Mutual-NDA-coverpage.md";
-const STANDARD_TERMS_FILE = "Mutual-NDA.md";
+const INDENT = 4;
+// Invisible left-to-right marks, which the PDF's built-in fonts cannot draw.
+const LTR_MARK = /\u200e/g;
+const LIST_ITEM = /^( *)(\d+|[a-z]+)\.\s+(.*)$/;
 
-function lines(markdown: string): string[] {
-  return markdown
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+/**
+ * Labels a clause from its list marker: "4." at the top level, "4.2" below it,
+ * then "(a)" and "(i)" for deeper levels.
+ */
+function clauseLabel(level: number, marker: string, section: string): string {
+  if (level === 0) return `${marker}.`;
+  if (level === 1) return `${section}.${marker}`;
+  return `(${marker})`;
 }
 
-function required<T>(value: T | undefined, description: string): T {
-  if (value === undefined) {
-    throw new Error(`Mutual NDA template is missing its ${description}`);
+/**
+ * Parses Common Paper standard terms: a `# Title` followed by nested numbered
+ * lists. Common Paper attribution lines are skipped (the document adds its own);
+ * any other line means the template changed shape, so parsing fails loudly.
+ */
+export function parseTemplate(markdown: string): ParsedTemplate {
+  let title: string | undefined;
+  let section = "";
+  const clauses: Clause[] = [];
+
+  for (const line of markdown.replace(LTR_MARK, "").split("\n")) {
+    if (!line.trim() || line.startsWith("Common Paper")) continue;
+    if (line.startsWith("# ")) {
+      title = line.slice(2).trim();
+      continue;
+    }
+    const match = LIST_ITEM.exec(line);
+    if (!match) throw new Error(`Unexpected template line: ${line.slice(0, 60)}`);
+    const [, indent, marker, text] = match;
+    const level = indent.length / INDENT;
+    if (level === 0) section = marker;
+    clauses.push({ level, label: clauseLabel(level, marker, section), content: parseInline(text) });
   }
-  return value;
+
+  if (!title) throw new Error("Template is missing its # title");
+  if (clauses.length === 0) throw new Error("Template has no clauses");
+  return { title, clauses };
 }
 
-/** Extracts the reusable text from the Common Paper Mutual NDA markdown files. */
-export function parseNdaTemplate(coverPage: string, standardTerms: string): NdaTemplate {
-  const coverLines = lines(coverPage);
-  const usingHeading = coverLines.findIndex((line) => /^##\s+USING THIS/i.test(line));
-  const coverIntro = required(
-    usingHeading === -1 ? undefined : coverLines[usingHeading + 1],
-    "cover page introduction",
-  );
-  const coverAttribution = required(
-    coverLines.findLast((line) => line.startsWith("Common Paper")),
-    "cover page attribution",
-  );
-
-  const termsLines = lines(standardTerms);
-  const title = required(
-    termsLines.find((line) => line.startsWith("# ")),
-    "Standard Terms title",
-  ).replace(/^#\s+/, "");
-  const clauses = termsLines
-    .filter((line) => /^\d+\.\s/.test(line))
-    .map((line) => parseInline(line.replace(/^\d+\.\s+/, "")));
-  if (clauses.length === 0) {
-    throw new Error("Mutual NDA template is missing its Standard Terms clauses");
-  }
-  const termsAttribution = required(
-    termsLines.findLast((line) => line.startsWith("Common Paper")),
-    "Standard Terms attribution",
-  );
-
-  return {
-    coverIntro: parseInline(coverIntro),
-    coverAttribution: parseInline(coverAttribution),
-    standardTermsTitle: title,
-    clauses,
-    standardTermsAttribution: parseInline(termsAttribution),
-  };
-}
-
-/** Reads and parses the Mutual NDA templates. Server-only (uses the filesystem). */
-export function loadNdaTemplate(): NdaTemplate {
-  const read = (file: string) => readFileSync(path.join(TEMPLATES_DIR, file), "utf8");
-  return parseNdaTemplate(read(COVER_PAGE_FILE), read(STANDARD_TERMS_FILE));
+/** Reads documents.json and parses each document's template. Server-only (uses the filesystem). */
+export function loadDocumentTypes(): DocumentType[] {
+  const read = (file: string) => readFileSync(path.join(REPO_ROOT, file), "utf8");
+  const specs: DocumentSpec[] = JSON.parse(read("documents.json"));
+  return specs.map((spec) => ({ spec, template: parseTemplate(read(path.join("templates", spec.file))) }));
 }

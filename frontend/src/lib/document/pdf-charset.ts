@@ -1,4 +1,4 @@
-import type { NdaValues } from "./types";
+import type { DocumentValues } from "./types";
 
 /**
  * Characters outside Latin-1 that the PDF's built-in Times fonts can still draw
@@ -22,13 +22,7 @@ function isPdfSafe(char: string): boolean {
  * The distinct characters in the user's input that the PDF cannot render
  * (they would come out garbled), in order of first appearance.
  */
-export function unsupportedPdfCharacters(values: NdaValues): string[] {
-  const text = [
-    values.purpose,
-    values.governingLaw,
-    values.jurisdiction,
-    values.modifications,
-    ...values.parties.flatMap((party) => Object.values(party)),
-  ].join("");
+export function unsupportedPdfCharacters(values: DocumentValues): string[] {
+  const text = [...Object.values(values.terms), ...values.parties.flatMap((party) => Object.values(party))].join("");
   return [...new Set([...text].filter((char) => !isPdfSafe(char)))];
 }

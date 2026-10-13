@@ -1,26 +1,32 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildNdaDocument,
-  defaultNdaValues,
-  formatDate,
-  formatYears,
-  pdfFilename,
-  todayIso,
-} from "./build";
-import type { Block, NdaTemplate, NdaValues } from "./types";
+import { buildDocument, defaultDocumentValues, formatDate, pdfFilename, todayIso } from "./build";
+import type { Block, DocumentType, DocumentValues } from "./types";
 
-const template: NdaTemplate = {
-  coverIntro: [{ text: "Intro" }],
-  coverAttribution: [{ text: "Cover attribution" }],
-  standardTermsTitle: "Standard Terms",
-  clauses: [[{ text: "First" }], [{ text: "Second" }]],
-  standardTermsAttribution: [{ text: "Terms attribution" }],
+const pilot: DocumentType = {
+  spec: {
+    id: "pilot-agreement",
+    name: "Pilot Agreement",
+    description: "A pilot.",
+    file: "Pilot-Agreement.md",
+    roles: ["Provider", "Customer"],
+    terms: [
+      { key: "pilotPeriod", label: "Pilot Period", hint: "e.g. 90 days" },
+      { key: "governingLaw", label: "Governing Law", hint: "A US state" },
+    ],
+  },
+  template: {
+    title: "Pilot Agreement",
+    clauses: [
+      { level: 0, label: "1.", content: [{ text: "Pilot", bold: true }] },
+      { level: 1, label: "1.1", content: [{ text: "First" }] },
+    ],
+  },
 };
 
-const filled = (): NdaValues => ({
-  ...defaultNdaValues("2026-10-04"),
-  governingLaw: "Delaware",
-  jurisdiction: "courts located in New Castle, DE",
+const filled = (): DocumentValues => ({
+  ...defaultDocumentValues("2026-10-04"),
+  documentId: "pilot-agreement",
+  terms: { pilotPeriod: "90 days", governingLaw: "Delaware" },
   parties: [
     { name: "Ada Lovelace", title: "CEO", company: "Acme, Inc.", noticeAddress: "ada@acme.test" },
     { name: "Alan Turing", title: "CTO", company: "Globex LLC", noticeAddress: "alan@globex.test" },
@@ -58,106 +64,75 @@ describe("formatDate", () => {
   });
 });
 
-describe("formatYears", () => {
-  it("pluralises", () => {
-    expect(formatYears(1)).toBe("1 year");
-    expect(formatYears(3)).toBe("3 years");
-  });
-
-  it("rejects empty, non-positive, fractional and absurdly large values", () => {
-    for (const years of [NaN, 0, -1, 1.5, 101, 1e21, Infinity]) {
-      expect(formatYears(years), String(years)).toBeUndefined();
-    }
-    expect(formatYears(100)).toBe("100 years");
-  });
-});
-
 describe("todayIso", () => {
   it("uses the local calendar date", () => {
     expect(todayIso(new Date(2026, 0, 5, 23, 30))).toBe("2026-01-05");
   });
 });
 
-describe("buildNdaDocument", () => {
-  it("fills cover page fields from the values", () => {
-    const blocks = buildNdaDocument(template, filled());
+describe("defaultDocumentValues", () => {
+  it("starts with no document chosen", () => {
+    expect(defaultDocumentValues("2026-10-04")).toMatchObject({
+      documentId: null,
+      effectiveDate: "2026-10-04",
+      terms: {},
+    });
+  });
+});
 
-    expect(field(blocks, "Effective Date").lines).toEqual([
-      { value: "October 4, 2026", placeholder: false, label: undefined },
+describe("buildDocument", () => {
+  it("generates a cover page titled after the document", () => {
+    const blocks = buildDocument(pilot, filled());
+    expect(blocks.slice(0, 2)).toEqual([
+      { type: "title", text: "Pilot Agreement" },
+      { type: "heading", text: "Cover Page" },
     ]);
-    expect(field(blocks, "MNDA Term").lines[0].value).toBe("Expires 1 year from Effective Date.");
-    expect(field(blocks, "Term of Confidentiality").lines[0].value).toMatch(/^1 year from Effective Date, but/);
-    expect(field(blocks, "Governing Law & Jurisdiction").lines).toEqual([
-      { label: "Governing Law", value: "Delaware", placeholder: false },
-      { label: "Jurisdiction", value: "courts located in New Castle, DE", placeholder: false },
-    ]);
-    expect(field(blocks, "MNDA Modifications").lines[0].value).toBe("None.");
   });
 
-  it("renders the alternative term options", () => {
-    const blocks = buildNdaDocument(template, {
-      ...filled(),
-      mndaTerm: { kind: "untilTerminated", years: 3 },
-      confidentialityTerm: { kind: "perpetual", years: 3 },
-    });
+  it("fills a field for the effective date and each term, with the term's hint", () => {
+    const blocks = buildDocument(pilot, filled());
 
-    expect(field(blocks, "MNDA Term").lines[0].value).toBe(
-      "Continues until terminated in accordance with the terms of the MNDA.",
-    );
-    expect(field(blocks, "Term of Confidentiality").lines[0].value).toBe("In perpetuity.");
+    expect(field(blocks, "Effective Date").lines).toEqual([{ value: "October 4, 2026", placeholder: false }]);
+    expect(field(blocks, "Pilot Period")).toMatchObject({
+      hint: "e.g. 90 days",
+      lines: [{ value: "90 days", placeholder: false }],
+    });
+    expect(field(blocks, "Governing Law").lines[0].value).toBe("Delaware");
   });
 
-  it("marks missing values as placeholders", () => {
-    const blocks = buildNdaDocument(template, {
-      ...defaultNdaValues(),
-      purpose: "  ",
-      mndaTerm: { kind: "expires", years: 0 },
-      confidentialityTerm: { kind: "years", years: NaN },
-      governingLaw: " ",
-      modifications: "  \n ",
-    });
+  it("marks missing and blank values as placeholders", () => {
+    const blocks = buildDocument(pilot, { ...defaultDocumentValues(), terms: { governingLaw: "  \n " } });
 
-    expect(field(blocks, "Purpose").lines[0]).toMatchObject({ value: "[Purpose]", placeholder: true });
     expect(field(blocks, "Effective Date").lines[0]).toMatchObject({ placeholder: true });
-    expect(field(blocks, "MNDA Term").lines[0]).toMatchObject({ value: "[Number of years]", placeholder: true });
-    expect(field(blocks, "Term of Confidentiality").lines[0]).toMatchObject({
-      value: "[Number of years]",
-      placeholder: true,
-    });
-    expect(field(blocks, "Governing Law & Jurisdiction").lines.every((l) => l.placeholder)).toBe(true);
-    expect(field(blocks, "MNDA Modifications").lines[0].value).toBe("None.");
+    expect(field(blocks, "Pilot Period").lines[0]).toEqual({ value: "[Pilot Period]", placeholder: true });
+    expect(field(blocks, "Governing Law").lines[0]).toEqual({ value: "[Governing Law]", placeholder: true });
   });
 
-  it("ignores the stored years while an open-ended term is selected", () => {
-    const blocks = buildNdaDocument(template, {
-      ...filled(),
-      mndaTerm: { kind: "untilTerminated", years: NaN },
-      confidentialityTerm: { kind: "perpetual", years: 0 },
-    });
-
-    expect(field(blocks, "MNDA Term").lines[0].placeholder).toBe(false);
-    expect(field(blocks, "Term of Confidentiality").lines[0].placeholder).toBe(false);
+  it("ignores terms the document does not have", () => {
+    const blocks = buildDocument(pilot, { ...filled(), terms: { ...filled().terms, purpose: "Other" } });
+    expect(blocks.some((b) => b.type === "field" && b.heading === "Purpose")).toBe(false);
   });
 
   it("keeps user-entered markup as literal text", () => {
     const markup = '**bold** <span class="coverpage_link">Purpose</span> [x](https://evil.test) <script>';
-    const blocks = buildNdaDocument(template, {
+    const blocks = buildDocument(pilot, {
       ...filled(),
-      purpose: markup,
+      terms: { pilotPeriod: markup },
       parties: [{ ...filled().parties[0], company: markup }, filled().parties[1]],
     });
 
-    expect(field(blocks, "Purpose").lines[0].value).toBe(markup);
+    expect(field(blocks, "Pilot Period").lines[0].value).toBe(markup);
     const signatures = blocks.find((b) => b.type === "signatures");
     expect(signatures?.type === "signatures" && signatures.rows[3].values[0]).toBe(markup);
   });
 
-  it("fills the signature table and leaves signature and date blank", () => {
-    const signatures = buildNdaDocument(template, filled()).find((b) => b.type === "signatures");
+  it("fills the signature table under the document's party roles", () => {
+    const signatures = buildDocument(pilot, filled()).find((b) => b.type === "signatures");
 
     expect(signatures).toMatchObject({
-      intro: "By signing this Cover Page, each party agrees to enter into this MNDA as of the Effective Date.",
-      headers: ["Party 1", "Party 2"],
+      intro:
+        "By signing this Cover Page, each party agrees to enter into this Pilot Agreement as of the Effective Date.",
+      headers: ["Provider", "Customer"],
       rows: [
         { label: "Signature", values: ["", ""] },
         { label: "Print Name", values: ["Ada Lovelace", "Alan Turing"] },
@@ -169,48 +144,53 @@ describe("buildNdaDocument", () => {
     });
   });
 
-  it("appends the numbered standard terms after a page break", () => {
-    const blocks = buildNdaDocument(template, filled());
+  it("appends the nested standard terms and a CC BY attribution after a page break", () => {
+    const blocks = buildDocument(pilot, filled());
     const breakIndex = blocks.findIndex((b) => b.type === "pageBreak");
+    const [title, clause1, clause2, attribution] = blocks.slice(breakIndex + 1);
 
-    expect(blocks.slice(breakIndex + 1)).toEqual([
-      { type: "title", text: "Standard Terms" },
-      { type: "clause", number: 1, content: [{ text: "First" }] },
-      { type: "clause", number: 2, content: [{ text: "Second" }] },
-      { type: "attribution", content: [{ text: "Terms attribution" }] },
+    expect([title, clause1, clause2]).toEqual([
+      { type: "title", text: "Pilot Agreement" },
+      { type: "clause", level: 0, label: "1.", content: [{ text: "Pilot", bold: true }] },
+      { type: "clause", level: 1, label: "1.1", content: [{ text: "First" }] },
     ]);
+    expect(attribution).toMatchObject({ type: "attribution" });
+    expect(attribution.type === "attribution" && attribution.content).toContainEqual({
+      text: "CC BY 4.0",
+      href: "https://creativecommons.org/licenses/by/4.0/",
+    });
   });
 });
 
 describe("pdfFilename", () => {
-  it("includes slugified company names", () => {
-    expect(pdfFilename(filled())).toBe("Mutual-NDA-Acme-Inc-Globex-LLC.pdf");
-  });
-
-  it("falls back to a generic name", () => {
-    expect(pdfFilename(defaultNdaValues())).toBe("Mutual-NDA.pdf");
-  });
-
   const withCompanies = (company1: string, company2 = "") => {
-    const values = defaultNdaValues();
+    const values = defaultDocumentValues();
     values.parties[0].company = company1;
     values.parties[1].company = company2;
     return values;
   };
 
+  it("includes the document name and slugified company names", () => {
+    expect(pdfFilename(pilot.spec, filled())).toBe("Pilot-Agreement-Acme-Inc-Globex-LLC.pdf");
+  });
+
+  it("falls back to the document name", () => {
+    expect(pdfFilename(pilot.spec, defaultDocumentValues())).toBe("Pilot-Agreement.pdf");
+  });
+
   it("transliterates accented names", () => {
-    expect(pdfFilename(withCompanies("Müller GmbH", "Société Générale"))).toBe(
-      "Mutual-NDA-Muller-GmbH-Societe-Generale.pdf",
+    expect(pdfFilename(pilot.spec, withCompanies("Müller GmbH", "Société Générale"))).toBe(
+      "Pilot-Agreement-Muller-GmbH-Societe-Generale.pdf",
     );
   });
 
   it("drops names with no ASCII equivalent", () => {
-    expect(pdfFilename(withCompanies("株式会社", "Globex"))).toBe("Mutual-NDA-Globex.pdf");
+    expect(pdfFilename(pilot.spec, withCompanies("株式会社", "Globex"))).toBe("Pilot-Agreement-Globex.pdf");
   });
 
   it("truncates very long names without trailing dashes", () => {
-    const filename = pdfFilename(withCompanies("Acme ".repeat(30)));
-    expect(filename).toMatch(/^Mutual-NDA-(Acme-)*Acme\.pdf$/);
-    expect(filename.length).toBeLessThanOrEqual("Mutual-NDA-".length + 40 + ".pdf".length);
+    const filename = pdfFilename(pilot.spec, withCompanies("Acme ".repeat(30)));
+    expect(filename).toMatch(/^Pilot-Agreement-(Acme-)*Acme\.pdf$/);
+    expect(filename.length).toBeLessThanOrEqual("Pilot-Agreement-".length + 40 + ".pdf".length);
   });
 });

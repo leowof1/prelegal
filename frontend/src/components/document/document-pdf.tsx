@@ -22,6 +22,9 @@ const styles = StyleSheet.create({
 
 const FIELD_HEADING_MIN_PRESENCE = 30;
 
+/** Left indent per clause nesting level, in points. */
+const CLAUSE_INDENT = 18;
+
 /**
  * Longest run of characters a table cell renders unbroken. Narrow enough that
  * even wide glyphs (16 × "W" at 11pt) fit a party column, so values like
@@ -74,10 +77,7 @@ function BlockView({ block }: { block: Block }) {
             {block.hint && <Text style={styles.hint}>{block.hint}</Text>}
           </View>
           {block.lines.map((line, i) => (
-            <Text key={i}>
-              {line.label && <Text style={styles.bold}>{line.label}: </Text>}
-              {line.value}
-            </Text>
+            <Text key={i}>{line.value}</Text>
           ))}
         </View>
       );
@@ -110,8 +110,8 @@ function BlockView({ block }: { block: Block }) {
       );
     case "clause":
       return (
-        <Text style={styles.paragraph}>
-          {block.number}. <InlineText content={block.content} />
+        <Text style={[styles.paragraph, { marginLeft: block.level * CLAUSE_INDENT }]}>
+          {block.label} <InlineText content={block.content} />
         </Text>
       );
     case "attribution":
@@ -137,9 +137,9 @@ function splitPages(blocks: Block[]): Block[][] {
 }
 
 /** Renders the document model to a PDF file. Client-side; import lazily. */
-export function renderDocumentPdf(blocks: Block[]): Promise<Blob> {
+export function renderDocumentPdf(title: string, blocks: Block[]): Promise<Blob> {
   return pdf(
-    <Document title="Mutual Non-Disclosure Agreement" creator="Prelegal">
+    <Document title={title} creator="Prelegal">
       {splitPages(blocks).map((pageBlocks, pageIndex) => (
         <Page key={pageIndex} size="LETTER" style={styles.page}>
           {pageBlocks.map((block, i) => (

@@ -2,10 +2,10 @@ name: Frontend
 
 on:
   pull_request:
-    paths: ["frontend/**", "templates/**", "backend/**", ".github/workflows/frontend.yml"]
+    paths: ["frontend/**", "templates/**", "documents.json", "backend/**", ".github/workflows/frontend.yml"]
   push:
     branches: [main]
-    paths: ["frontend/**", "templates/**", "backend/**", ".github/workflows/frontend.yml"]
+    paths: ["frontend/**", "templates/**", "documents.json", "backend/**", ".github/workflows/frontend.yml"]
 
 concurrency:
   group: frontend-${{ github.ref }}

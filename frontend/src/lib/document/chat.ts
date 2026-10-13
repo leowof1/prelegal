@@ -1,37 +1,37 @@
-import type { NdaValues } from "./types";
+import type { DocumentValues } from "./types";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-/** NdaValues as JSON: JSON.stringify sends NaN (an empty years field) as null, and the AI may reply with null. */
-export interface WireValues extends Omit<NdaValues, "mndaTerm" | "confidentialityTerm"> {
-  mndaTerm: { kind: NdaValues["mndaTerm"]["kind"]; years: number | null };
-  confidentialityTerm: { kind: NdaValues["confidentialityTerm"]["kind"]; years: number | null };
+/** DocumentValues as the API sends them: terms are a list, so the AI's reply fits a strict JSON schema. */
+export interface WireValues extends Omit<DocumentValues, "terms"> {
+  terms: { key: string; value: string }[];
 }
 
-/** Null years keep the previous value, so switching back from an open-ended term restores it. */
-export function fromWire(wire: WireValues, previous: NdaValues): NdaValues {
-  return {
-    ...wire,
-    mndaTerm: { ...wire.mndaTerm, years: wire.mndaTerm.years ?? previous.mndaTerm.years },
-    confidentialityTerm: {
-      ...wire.confidentialityTerm,
-      years: wire.confidentialityTerm.years ?? previous.confidentialityTerm.years,
-    },
-  };
+export function toWire(values: DocumentValues): WireValues {
+  return { ...values, terms: Object.entries(values.terms).map(([key, value]) => ({ key, value })) };
+}
+
+/**
+ * Terms the reply leaves out keep their previous value, and values for terms the
+ * new document shares with the previous one (e.g. governing law) carry over.
+ */
+export function fromWire(wire: WireValues, previous: DocumentValues): DocumentValues {
+  const terms = Object.fromEntries(wire.terms.map(({ key, value }) => [key, value]));
+  return { ...wire, terms: { ...previous.terms, ...terms } };
 }
 
 /** Sends the conversation and current values; returns the AI's reply and the updated values. */
 export async function sendChat(
   messages: ChatMessage[],
-  values: NdaValues,
-): Promise<{ reply: string; values: NdaValues }> {
+  values: DocumentValues,
+): Promise<{ reply: string; values: DocumentValues }> {
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, values }),
+    body: JSON.stringify({ messages, values: toWire(values) }),
   });
   if (!response.ok) throw new Error(`Chat request failed: ${response.status}`);
   const data: { reply: string; values: WireValues } = await response.json();

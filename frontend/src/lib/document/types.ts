@@ -1,4 +1,4 @@
-/** Values the user enters in the form. */
+/** A party's signer and company, as gathered by the AI chat. */
 export interface PartyDetails {
   name: string;
   title: string;
@@ -6,19 +6,31 @@ export interface PartyDetails {
   noticeAddress: string;
 }
 
-export interface NdaValues {
-  purpose: string;
-  /** ISO date (YYYY-MM-DD), as produced by `<input type="date">`. */
+/** A key term a document asks for, e.g. Governing Law. */
+export interface TermSpec {
+  key: string;
+  label: string;
+  hint: string;
+}
+
+/** A supported document, as described in the repository's documents.json. */
+export interface DocumentSpec {
+  id: string;
+  name: string;
+  description: string;
+  /** Standard terms file in the repository's templates directory. */
+  file: string;
+  roles: [string, string];
+  terms: TermSpec[];
+}
+
+export interface DocumentValues {
+  /** The chosen document, or null until the AI has agreed one with the user. */
+  documentId: string | null;
+  /** ISO date (YYYY-MM-DD). */
   effectiveDate: string;
-  /**
-   * `years` is kept while the open-ended option is selected so switching back
-   * restores it. NaN means the years field is empty.
-   */
-  mndaTerm: { kind: "expires" | "untilTerminated"; years: number };
-  confidentialityTerm: { kind: "years" | "perpetual"; years: number };
-  governingLaw: string;
-  jurisdiction: string;
-  modifications: string;
+  /** Term values by term key. */
+  terms: Record<string, string>;
   parties: [PartyDetails, PartyDetails];
 }
 
@@ -29,17 +41,27 @@ export interface Inline {
   href?: string;
 }
 
-/** Template text extracted from the Common Paper markdown files. */
-export interface NdaTemplate {
-  coverIntro: Inline[];
-  coverAttribution: Inline[];
-  standardTermsTitle: string;
-  clauses: Inline[][];
-  standardTermsAttribution: Inline[];
+/** A numbered clause of the standard terms; `level` 0 is a top-level section. */
+export interface Clause {
+  level: number;
+  /** The clause number as shown, e.g. "4.", "4.2" or "(a)". */
+  label: string;
+  content: Inline[];
+}
+
+/** The standard terms parsed from a Common Paper markdown file. */
+export interface ParsedTemplate {
+  title: string;
+  clauses: Clause[];
+}
+
+/** A supported document together with its parsed standard terms. */
+export interface DocumentType {
+  spec: DocumentSpec;
+  template: ParsedTemplate;
 }
 
 export interface FieldLine {
-  label?: string;
   value: string;
   /** True when the user has not supplied this value and `value` is a placeholder. */
   placeholder: boolean;
@@ -61,6 +83,6 @@ export type Block =
       headers: [string, string];
       rows: { label: string; values: [string, string] }[];
     }
-  | { type: "clause"; number: number; content: Inline[] }
+  | ({ type: "clause" } & Clause)
   | { type: "attribution"; content: Inline[] }
   | { type: "pageBreak" };

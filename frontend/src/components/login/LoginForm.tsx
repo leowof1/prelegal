@@ -13,7 +13,7 @@ export function LoginForm() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     signIn({ name: String(data.get("name")).trim(), email: String(data.get("email")).trim() });
-    router.push("/nda/");
+    router.push("/create/");
   }
 
   return (

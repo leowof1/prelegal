@@ -1,21 +1,9 @@
-import type { Block, FieldLine, NdaTemplate, NdaValues, PartyDetails } from "./types";
-
-export const DEFAULT_PURPOSE =
-  "Evaluating whether to enter into a business relationship with the other party.";
+import type { Block, DocumentSpec, DocumentType, DocumentValues, FieldLine, Inline, PartyDetails } from "./types";
 
 const emptyParty = (): PartyDetails => ({ name: "", title: "", company: "", noticeAddress: "" });
 
-export function defaultNdaValues(effectiveDate = ""): NdaValues {
-  return {
-    purpose: DEFAULT_PURPOSE,
-    effectiveDate,
-    mndaTerm: { kind: "expires", years: 1 },
-    confidentialityTerm: { kind: "years", years: 1 },
-    governingLaw: "",
-    jurisdiction: "",
-    modifications: "",
-    parties: [emptyParty(), emptyParty()],
-  };
+export function defaultDocumentValues(effectiveDate = ""): DocumentValues {
+  return { documentId: null, effectiveDate, terms: {}, parties: [emptyParty(), emptyParty()] };
 }
 
 /** Today's date in the user's local time zone as YYYY-MM-DD. */
@@ -45,45 +33,23 @@ export function formatDate(iso: string): string | undefined {
   });
 }
 
-export const MAX_TERM_YEARS = 100;
-
-/** "1 year" / "3 years"; undefined unless `years` is a whole number from 1 to MAX_TERM_YEARS. */
-export function formatYears(years: number): string | undefined {
-  if (!Number.isInteger(years) || years < 1 || years > MAX_TERM_YEARS) return undefined;
-  return years === 1 ? "1 year" : `${years} years`;
-}
-
-function line(value: string | undefined, placeholder: string, label?: string): FieldLine {
+function line(value: string | undefined, placeholder: string): FieldLine {
   const trimmed = value?.trim();
-  return trimmed
-    ? { label, value: trimmed, placeholder: false }
-    : { label, value: `[${placeholder}]`, placeholder: true };
+  return trimmed ? { value: trimmed, placeholder: false } : { value: `[${placeholder}]`, placeholder: true };
 }
 
-const fixed = (value: string): FieldLine => ({ value, placeholder: false });
+const LICENSE_URL = "https://creativecommons.org/licenses/by/4.0/";
 
-function mndaTermLine(term: NdaValues["mndaTerm"]): FieldLine {
-  if (term.kind === "untilTerminated") {
-    return fixed("Continues until terminated in accordance with the terms of the MNDA.");
-  }
-  const years = formatYears(term.years);
-  return years
-    ? fixed(`Expires ${years} from Effective Date.`)
-    : line(undefined, "Number of years");
+function attribution(spec: DocumentSpec): Inline[] {
+  return [
+    { text: `Based on the Common Paper ${spec.name} standard terms, free to use under ` },
+    { text: "CC BY 4.0", href: LICENSE_URL },
+    { text: "." },
+  ];
 }
 
-function confidentialityTermLine(term: NdaValues["confidentialityTerm"]): FieldLine {
-  if (term.kind === "perpetual") return fixed("In perpetuity.");
-  const years = formatYears(term.years);
-  return years
-    ? fixed(
-        `${years} from Effective Date, but in the case of trade secrets until Confidential Information is no longer considered a trade secret under applicable laws.`,
-      )
-    : line(undefined, "Number of years");
-}
-
-/** Combines the template text with the user's values into a renderable document. */
-export function buildNdaDocument(template: NdaTemplate, values: NdaValues): Block[] {
+/** Combines a document's standard terms with the user's values: a generated cover page, then the terms. */
+export function buildDocument({ spec, template }: DocumentType, values: DocumentValues): Block[] {
   const [party1, party2] = values.parties;
   const partyRow = (label: string, key: keyof PartyDetails) => ({
     label,
@@ -91,49 +57,31 @@ export function buildNdaDocument(template: NdaTemplate, values: NdaValues): Bloc
   });
 
   return [
-    { type: "title", text: "Mutual Non-Disclosure Agreement" },
-    { type: "heading", text: "Using this Mutual Non-Disclosure Agreement" },
-    { type: "paragraph", content: template.coverIntro },
+    { type: "title", text: spec.name },
+    { type: "heading", text: "Cover Page" },
     {
-      type: "field",
-      heading: "Purpose",
-      hint: "How Confidential Information may be used",
-      lines: [line(values.purpose, "Purpose")],
+      type: "paragraph",
+      content: [
+        {
+          text: `This Cover Page and the ${spec.name} Standard Terms that follow form the agreement. Terms in bold in the Standard Terms have the meanings given on this Cover Page.`,
+        },
+      ],
     },
     {
       type: "field",
       heading: "Effective Date",
       lines: [line(formatDate(values.effectiveDate), "Effective Date")],
     },
-    {
+    ...spec.terms.map((term): Block => ({
       type: "field",
-      heading: "MNDA Term",
-      hint: "The length of this MNDA",
-      lines: [mndaTermLine(values.mndaTerm)],
-    },
-    {
-      type: "field",
-      heading: "Term of Confidentiality",
-      hint: "How long Confidential Information is protected",
-      lines: [confidentialityTermLine(values.confidentialityTerm)],
-    },
-    {
-      type: "field",
-      heading: "Governing Law & Jurisdiction",
-      lines: [
-        line(values.governingLaw, "State", "Governing Law"),
-        line(values.jurisdiction, "City or county and state", "Jurisdiction"),
-      ],
-    },
-    {
-      type: "field",
-      heading: "MNDA Modifications",
-      lines: [fixed(values.modifications.trim() || "None.")],
-    },
+      heading: term.label,
+      hint: term.hint,
+      lines: [line(values.terms[term.key], term.label)],
+    })),
     {
       type: "signatures",
-      intro: "By signing this Cover Page, each party agrees to enter into this MNDA as of the Effective Date.",
-      headers: ["Party 1", "Party 2"],
+      intro: `By signing this Cover Page, each party agrees to enter into this ${spec.name} as of the Effective Date.`,
+      headers: spec.roles,
       rows: [
         { label: "Signature", values: ["", ""] },
         partyRow("Print Name", "name"),
@@ -143,20 +91,18 @@ export function buildNdaDocument(template: NdaTemplate, values: NdaValues): Bloc
         { label: "Date", values: ["", ""] },
       ],
     },
-    { type: "attribution", content: template.coverAttribution },
+    { type: "attribution", content: attribution(spec) },
     { type: "pageBreak" },
-    { type: "title", text: template.standardTermsTitle },
-    ...template.clauses.map(
-      (content, index): Block => ({ type: "clause", number: index + 1, content }),
-    ),
-    { type: "attribution", content: template.standardTermsAttribution },
+    { type: "title", text: template.title },
+    ...template.clauses.map((clause): Block => ({ type: "clause", ...clause })),
+    { type: "attribution", content: attribution(spec) },
   ];
 }
 
 const MAX_SLUG_LENGTH = 40;
 
-/** A filesystem-safe ASCII PDF filename based on the party companies. */
-export function pdfFilename(values: NdaValues): string {
+/** A filesystem-safe ASCII PDF filename based on the document name and party companies. */
+export function pdfFilename(spec: DocumentSpec, values: DocumentValues): string {
   const slug = (s: string) =>
     s
       .normalize("NFKD")
@@ -165,5 +111,5 @@ export function pdfFilename(values: NdaValues): string {
       .slice(0, MAX_SLUG_LENGTH)
       .replace(/^-+|-+$/g, "");
   const companies = values.parties.map((p) => slug(p.company)).filter(Boolean);
-  return ["Mutual-NDA", ...companies].join("-") + ".pdf";
+  return [slug(spec.name), ...companies].join("-") + ".pdf";
 }

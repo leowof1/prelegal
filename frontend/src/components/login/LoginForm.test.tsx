@@ -25,7 +25,7 @@ describe("LoginForm", () => {
       name: "Ada Lovelace",
       email: "ada@acme.test",
     });
-    expect(push).toHaveBeenCalledWith("/nda/");
+    expect(push).toHaveBeenCalledWith("/create/");
   });
 
   it("requires a name and a valid email", async () => {

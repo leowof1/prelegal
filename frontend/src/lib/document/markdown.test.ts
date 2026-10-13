@@ -22,6 +22,32 @@ describe("parseInline", () => {
     ]);
   });
 
+  it("bolds every kind of defined-term reference and clause heading", () => {
+    const kinds = ["keyterms_link", "orderform_link", "sow_link", "businessterms_link", "header_2", "header_3"];
+    for (const kind of kinds) {
+      expect(parseInline(`<span class="${kind}" id="1.1">Term</span> applies`)).toEqual([
+        { text: "Term", bold: true },
+        { text: " applies" },
+      ]);
+    }
+  });
+
+  it("drops anchor spans but keeps their content", () => {
+    expect(parseInline('<span id="4.1"></span>**"AI"** means <span id="4.2">**"Input"**</span>')).toEqual([
+      { text: '"AI"', bold: true },
+      { text: " means " },
+      { text: '"Input"', bold: true },
+    ]);
+  });
+
+  it("parses autolinks", () => {
+    expect(parseInline("posted at <https://commonpaper.com/x>.")).toEqual([
+      { text: "posted at " },
+      { text: "https://commonpaper.com/x", href: "https://commonpaper.com/x" },
+      { text: "." },
+    ]);
+  });
+
   it("returns no runs for an empty string", () => {
     expect(parseInline("")).toEqual([]);
   });

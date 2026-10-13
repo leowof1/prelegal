@@ -4,8 +4,9 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-# The NDA page is prerendered from the repo's templates at build time.
+# The creator page is prerendered from the repo's templates at build time.
 COPY templates/ /app/templates/
+COPY documents.json /app/documents.json
 RUN npm run build
 
 # Stage 2: FastAPI backend serving the API and the exported frontend.
@@ -17,6 +18,8 @@ COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY backend/src/ ./src/
 RUN uv sync --locked --no-dev
+# The chat prompt describes the supported documents.
+COPY documents.json /app/documents.json
 COPY --from=frontend /app/frontend/out /app/frontend/out
 
 ENV PATH="/app/backend/.venv/bin:$PATH" \

@@ -2,14 +2,20 @@
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { type ChatMessage, sendChat } from "@/lib/document/chat";
-import type { NdaValues } from "@/lib/document/types";
+import type { DocumentValues } from "@/lib/document/types";
 import { inputClass, submitButtonClass } from "@/components/ui/styles";
 
 export const GREETING =
-  "Hi! I'll help you draft a Mutual Non-Disclosure Agreement. To start, who are the two parties, and why will they be sharing confidential information?";
+  "Hi! I'll help you draft a legal agreement, such as an NDA, a cloud service agreement or a pilot agreement. What would you like to create, and who are the parties?";
 
-/** Freeform AI chat that fills in the NDA values as the conversation goes. */
-export function DocumentChat({ values, onChange }: { values: NdaValues; onChange: (values: NdaValues) => void }) {
+/** Freeform AI chat that picks the document and fills in its values as the conversation goes. */
+export function DocumentChat({
+  values,
+  onChange,
+}: {
+  values: DocumentValues;
+  onChange: (values: DocumentValues) => void;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: GREETING }]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
