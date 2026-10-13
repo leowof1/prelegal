@@ -38,5 +38,10 @@ jobs:
           # Capture pages before grepping: grep -q exiting early would break curl's pipe under pipefail.
           login=$(curl -sf localhost:8000/)
           create=$(curl -sf localhost:8000/create/)
+          documents=$(curl -sf localhost:8000/documents/)
           grep -q "<title>Sign in | Prelegal</title>" <<<"$login"
           grep -q "<title>Document Creator | Prelegal</title>" <<<"$create"
+          grep -q "<title>My documents | Prelegal</title>" <<<"$documents"
+          # Sign up, then the session cookie opens the user's (empty) document list.
+          curl -sf -c jar -H "Content-Type: application/json" -d '{"name":"Ada","email":"ada@acme.test","password":"correct horse"}' localhost:8000/api/auth/signup
+          test "$(curl -sf -b jar localhost:8000/api/documents)" = "[]"

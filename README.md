@@ -14,7 +14,7 @@ scripts/start-mac.sh     # or start-linux.sh / start-windows.ps1
 scripts/stop-mac.sh      # or stop-linux.sh / stop-windows.ps1
 ```
 
-The app runs at http://localhost:8000. The SQLite database is recreated on every start.
+The app runs at http://localhost:8000. The SQLite database (accounts and saved documents) is recreated on every start.
 
 ## Layout
 
